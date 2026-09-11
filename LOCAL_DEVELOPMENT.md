@@ -54,6 +54,50 @@ npm install
 npm run dev
 ```
 
+## VS Code
+
+Open the repository root as the workspace folder (not `backend/` or `frontend/`),
+then accept the recommended extensions when prompted. The ones that matter are
+the Java and Spring Boot packs, Tailwind IntelliSense and Docker.
+
+The repository ships shared `launch.json` and `tasks.json`. Run tasks with
+**Ctrl+Shift+P -> Tasks: Run Task**.
+
+| Task | Does |
+| --- | --- |
+| `Stack: up (everything in Docker)` | Builds and starts all three services |
+| `Stack: down` | Stops them, keeping the database |
+| `Stack: logs` | Tails all container logs |
+| `Postgres: start` | Database only, for host-side development |
+| `Backend: run` | `mvn spring-boot:run` with seeding on |
+| `Backend: test` | The test suite (default test task) |
+| `Frontend: dev` | Vite dev server (default build task is `Frontend: build`) |
+
+### Debugging
+
+**F5 -> `Backend: debug`** launches the app with breakpoints, hot-swapping
+method bodies on save. It needs Postgres running and port 8080 free, so stop the
+backend container first:
+
+```bash
+docker compose stop backend frontend
+docker compose up -d postgres
+```
+
+`Full stack: debug` starts Postgres and the Vite server, then launches the
+backend debugger and a Chrome window against http://localhost:5173.
+
+Breakpoints in the browser work through the `Frontend: debug in Chrome`
+configuration; `.tsx` files map back to source automatically.
+
+### Which mode to use
+
+Use Docker when you want the real deployed topology, including nginx. Use the
+host-side mode while writing code: Vite reloads the browser on save and the
+Spring Boot devtools-free restart is still faster than rebuilding an image. Note
+that in host-side mode nginx is not in the path, so a route added to
+`vite.config.ts` must also be added to `nginx.conf` before it works in Docker.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust as needed. Defaults are wired for local

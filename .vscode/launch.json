@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Needs Postgres reachable on localhost:5432. Run the "Postgres: start"
+      // task first, and make sure the backend container is not holding port 8080.
+      "type": "java",
+      "name": "Backend: debug",
+      "request": "launch",
+      "mainClass": "com.policypulse.PolicyPulseApplication",
+      "projectName": "policy-pulse",
+      "env": {
+        // Seeds the demo tenant so the login screen works. The datasource
+        // defaults in application.yml already match the compose Postgres.
+        "APP_SEED": "true"
+      }
+    },
+    {
+      // Attach to the Vite dev server. Start "Frontend: dev" first.
+      "type": "chrome",
+      "name": "Frontend: debug in Chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack: debug",
+      "configurations": ["Backend: debug", "Frontend: debug in Chrome"],
+      "preLaunchTask": "Dev: start Postgres and frontend",
+      "stopAll": true
+    }
+  ]
+}

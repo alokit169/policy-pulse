@@ -1,0 +1,89 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Stack: up (everything in Docker)",
+      "type": "shell",
+      "command": "docker compose up -d --build",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Stack: down",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: down and drop the database",
+      "type": "shell",
+      "command": "docker compose down -v",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: logs",
+      "type": "shell",
+      "command": "docker compose logs -f --tail=100",
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      // For host-side development: database only, so ports 8080 and 5173 stay
+      // free for the app running in VS Code.
+      "label": "Postgres: start",
+      "type": "shell",
+      "command": "docker compose up -d postgres",
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: run",
+      "type": "shell",
+      "command": "mvn spring-boot:run",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "env": { "APP_SEED": "true" }
+      },
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Backend: test",
+      "type": "shell",
+      "command": "mvn test",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Frontend: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: install",
+      "type": "shell",
+      "command": "npm install",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: start Postgres and frontend",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Postgres: start", "Frontend: dev"],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,7 +1,11 @@
 target/
 .idea/
 *.iml
-.vscode/
+# Shared VS Code config is tracked; personal settings are not.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 node_modules/
 dist/
 .env
