@@ -1,0 +1,6 @@
+# Host node_modules are platform-specific; copying them over the image's
+# Linux-built ones breaks esbuild/rollup native binaries.
+node_modules
+dist
+.env
+npm-debug.log*
