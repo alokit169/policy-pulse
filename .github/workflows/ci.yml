@@ -209,12 +209,16 @@ jobs:
           # Dashboard.
           check "dashboard"         200 -H "$AUTH" http://localhost:5173/api/dashboard
 
-          # Money totals must be reported per currency, never summed across them.
+          # Rupees only, so a total across policies is meaningful.
+          check "other currencies rejected" 400 -X POST http://localhost:5173/api/policies \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"$CUSTOMER\",\"insuranceProvider\":\"X\",\"policyType\":\"TERM\",\"currencyCode\":\"USD\",\"premiumAmount\":\"100.00\",\"premiumFrequency\":\"YEARLY\"}"
+
           DASH=$(curl -s -H "$ADMIN_AUTH" http://localhost:5173/api/dashboard)
-          if echo "$DASH" | grep -q '"amounts":\[' && echo "$DASH" | grep -q '"currencyCode"'; then
-            echo "ok    dashboard reports money per currency"
+          if echo "$DASH" | grep -q '"overdue":{"count":[0-9]*,"amount":'; then
+            echo "ok    dashboard reports a single money total"
           else
-            echo "FAIL  dashboard money is not grouped by currency: $DASH"
+            echo "FAIL  unexpected dashboard money shape: $DASH"
             failed=1
           fi
 
