@@ -13,6 +13,7 @@ Migrations live in `backend/src/main/resources/db/migration` and are named
 | `V2__auth_and_audit` | Globally unique user email, audit log indexes |
 | `V3__token_revocation` | `users.token_version` |
 | `V4__premium_schedule` | Unique instalment per policy and due date |
+| `V5__premium_optimistic_locking` | `premium_payments.version` |
 
 ### Rules
 
@@ -57,6 +58,16 @@ email therefore identifies exactly one user.
 | `customers` | Unique `(organization_id, customer_number)` and `(organization_id, phone)` |
 | `policies` | References a customer. Unique `(organization_id, policy_number)` |
 | `premium_payments` | Instalments, unique per `(policy_id, due_date)` |
+
+`premium_payments` carries a version column. Recording a payment reads an
+instalment, checks it is not already settled and then writes, so two simultaneous
+requests could otherwise both pass the check and both write, leaving one payment
+reference overwritten and two audit entries for a single collection. The version
+makes the losing write fail so the caller is told to retry. Policies are
+deliberately not versioned: their cached premium dates are derived from the
+instalments and recomputed on every change, so a lost update there corrects
+itself, and versioning them would reject two agents settling different
+instalments of the same policy at the same moment.
 
 A policy's schedule is generated from its start date, end date and frequency.
 Regenerating it after the terms change leaves paid and waived instalments

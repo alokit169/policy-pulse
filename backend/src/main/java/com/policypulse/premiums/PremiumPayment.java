@@ -24,6 +24,16 @@ public class PremiumPayment {
     private boolean verificationPending;
     private Instant createdAt;
 
+    /**
+     * Guards the read-check-write in PremiumService.recordPayment. Only the
+     * instalment carries a version: the policy's cached premium dates are derived
+     * from its instalments and recomputed on every change, so a lost update there
+     * corrects itself, and versioning the policy would reject two agents settling
+     * different instalments of the same policy at the same moment.
+     */
+    @Version
+    private long version;
+
     @PrePersist
     void pre() {
         if (id == null) id = UUID.randomUUID();
@@ -52,4 +62,5 @@ public class PremiumPayment {
     public void setVerificationPending(boolean verificationPending) { this.verificationPending = verificationPending; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public long getVersion() { return version; }
 }

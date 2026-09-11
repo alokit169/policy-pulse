@@ -291,4 +291,78 @@ class PolicyPremiumTest extends AbstractIntegrationTest {
         assertThat(after.get(0).get("amount").asText()).isEqualTo("5000.00");
         assertThat(after.get(1).get("amount").asText()).isEqualTo("7500.00");
     }
+
+    /**
+     * Regression: the currency default was applied on every save, so updating a
+     * USD policy without repeating the field turned it into an INR one and left
+     * the amounts untouched. The numbers stayed the same while their meaning
+     * changed, which no later read could detect.
+     */
+    @Test
+    void updatingAPolicyDoesNotResetItsCurrency() throws Exception {
+        Map<String, Object> body = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
+        body.put("currencyCode", "USD");
+        String policyId = create(body).get("id").asText();
+
+        Map<String, Object> update = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
+        update.put("nomineeName", "Someone");
+
+        mvc.perform(put("/api/policies/" + policyId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(update)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currencyCode").value("USD"));
+    }
+
+    @Test
+    void aNewPolicyDefaultsToRupeesAndTheCurrencyCanStillBeChanged() throws Exception {
+        String policyId = create(policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY")).get("id").asText();
+
+        Map<String, Object> update = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
+        update.put("currencyCode", "GBP");
+
+        mvc.perform(put("/api/policies/" + policyId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(update)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currencyCode").value("GBP"));
+    }
+
+    /**
+     * PUT replaces the whole policy, so omitting the term clears it and the
+     * generated schedule goes with it. Pinned deliberately: unsettled instalments
+     * are derived and come back when the dates do, but anything settled must
+     * survive regardless.
+     */
+    @Test
+    void clearingTheTermRemovesUnsettledInstalmentsButKeepsSettledOnes() throws Exception {
+        String policyId = create(policy("2024-01-01", "2027-01-01", "1000.00", "YEARLY")).get("id").asText();
+        assertThat(schedule(policyId)).hasSize(4);
+
+        String first = schedule(policyId).get(0).get("id").asText();
+        mvc.perform(post("/api/policies/" + policyId + "/premiums/" + first + "/pay")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"paidDate\":\"2024-01-02\"}"))
+                .andExpect(status().isOk());
+
+        Map<String, Object> withoutDates = new HashMap<>();
+        withoutDates.put("customerId", customerId);
+        withoutDates.put("insuranceProvider", "Example Life");
+        withoutDates.put("policyType", "ENDOWMENT");
+        withoutDates.put("premiumAmount", "1000.00");
+        withoutDates.put("premiumFrequency", "YEARLY");
+
+        mvc.perform(put("/api/policies/" + policyId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(withoutDates)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nextPremiumDueDate").doesNotExist());
+
+        JsonNode after = schedule(policyId);
+        assertThat(after).hasSize(1);
+        assertThat(after.get(0).get("status").asText()).isEqualTo("PAID");
+    }
 }

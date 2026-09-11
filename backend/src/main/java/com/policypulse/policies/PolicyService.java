@@ -92,6 +92,7 @@ public class PolicyService {
         policy.setAgentId(resolveAgent(caller, request.agentId(), customer));
         policy.setPolicyNumber(resolvePolicyNumber(orgId, request.policyNumber()));
         policy.setStatus(Domain.PolicyStatus.ACTIVE);
+        policy.setCurrencyCode("INR");
         apply(request, policy);
         policies.save(policy);
 
@@ -211,7 +212,12 @@ public class PolicyService {
         policy.setInsuranceProvider(request.insuranceProvider().trim());
         policy.setPolicyType(request.policyType().trim());
         policy.setPlanName(blankToNull(request.planName()));
-        policy.setCurrencyCode(request.currencyCode() == null ? "INR" : request.currencyCode());
+        // Only set when supplied. Defaulting here would turn a USD policy into an
+        // INR one on any update that omitted the field, leaving the amounts
+        // untouched and the currency wrong.
+        if (request.currencyCode() != null) {
+            policy.setCurrencyCode(request.currencyCode());
+        }
         policy.setSumAssured(request.sumAssured());
         policy.setPremiumAmount(request.premiumAmount());
         policy.setPremiumFrequency(request.premiumFrequency());

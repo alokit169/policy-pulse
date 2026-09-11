@@ -3,6 +3,7 @@ package com.policypulse.common;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -38,6 +39,16 @@ public class GlobalExceptionHandler {
                 .map(FieldError::getDefaultMessage)
                 .orElse("Validation failed");
         return error(HttpStatus.BAD_REQUEST, msg);
+    }
+
+    /**
+     * Two requests changed the same record at once and this one lost. The work is
+     * not lost, only rejected: the caller should reload and try again.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleConcurrentChange(OptimisticLockingFailureException ex) {
+        log.warn("Concurrent modification rejected: {}", ex.getMessage());
+        return error(HttpStatus.CONFLICT, "This record changed while you were working on it. Reload and try again.");
     }
 
     /**

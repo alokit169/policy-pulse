@@ -148,6 +148,7 @@ performs. Docker must be running.
 | `PolicyIsolationTest` | Policies stay in their tenant, including the customer they reference |
 | `PolicyPremiumTest` | Schedule generation, payment, waiving, money scale |
 | `PremiumScheduleTest` | Due-date arithmetic, including month-end and leap years |
+| `PremiumConcurrencyTest` | Simultaneous payments settle an instalment exactly once |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 
