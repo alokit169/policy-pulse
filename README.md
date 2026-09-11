@@ -31,10 +31,11 @@ Sign in at http://localhost:5173. The API issues a bearer token from
 - [ARCHITECTURE.md](ARCHITECTURE.md) — modules, flows and the phase roadmap
 - [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) — running it, VS Code, tests
 - [DATABASE.md](DATABASE.md) — schema, migrations and multi-tenancy
-- [SECURITY.md](SECURITY.md) — auth model, isolation rules and known gaps
+- [SECURITY.md](SECURITY.md) — auth model, isolation rules, what the assistant and the calling path may do, and known gaps
 
 The live API reference is Swagger UI at
 http://localhost:8080/swagger-ui.html once the stack is running.
 
-Planned, arriving with the phases that introduce them: `AI_ARCHITECTURE.md`,
-`VOICE_ARCHITECTURE.md`, `DEPLOYMENT.md`.
+What the assistant and the calling path are allowed to do turned out to belong
+with the rest of the limits, so it lives in SECURITY.md rather than in
+documents of its own. `DEPLOYMENT.md` is still to come.

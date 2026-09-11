@@ -113,7 +113,7 @@ development, so the app runs without any `.env` present.
 | `RATE_LIMIT_RPM` | `120` | Requests per minute per client |
 | `APP_SEED` | `false` | Seed demo data on boot |
 | `AI_PROVIDER` | `mock` | AI backend |
-| `VOICE_PROVIDER` | `mock` | Voice backend |
+| `VOICE_PROVIDER` | `mock` | Voice backend. Only `mock` is implemented; `twilio` fails at startup on purpose |
 | `NOTIFICATION_PROVIDER` | `mock` | Notification backend |
 
 Never commit a real `JWT_SECRET`. `.env` is gitignored.
@@ -150,6 +150,7 @@ performs. Docker must be running.
 | `PremiumScheduleTest` | Due-date arithmetic, including month-end and leap years |
 | `PremiumConcurrencyTest` | Simultaneous payments settle an instalment exactly once |
 | `ReminderDetectionTest` | Detection is repeatable, honours consent and reads each tenant's own date |
+| `ReminderDispatchTest` | Reminders are delivered at the scheduled moment, and only once |
 | `ReminderOffsetsTest` | Parsing the configured day offsets |
 | `ReminderApiTest` | Settings permissions, validation, notification ownership |
 | `FixedClockTest` | The suite really is running against a frozen clock |
@@ -158,6 +159,7 @@ performs. Docker must be running.
 | `FollowUpTest` | Commitments, ownership, timezone-aware due moments |
 | `AiSafetyTest` | What the assistant may cause, and above all what it may not |
 | `MockAIProviderTest` | Intent rules, including that only the customer is read |
+| `VoiceCallTest` | The calling window, attempt limits, retries and the transcript a call leaves |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 
@@ -177,6 +179,27 @@ so a SPA can tell the two apart.
 
 CI runs the same suite plus the frontend build and a smoke test of the full
 Docker stack. See `.github/workflows/ci.yml`.
+
+### Watching a call happen
+
+The mock provider dials nobody, but the rest of the path is real. Its outcome is
+decided by the last digit of the number, so a call can be steered: `0` rings out,
+`1` is busy, `2` cannot be dialled, and anything else is answered.
+
+Sign in as `admin@demo.local`, then, against `/api/reminders/configuration`, set
+`preferredChannel` to `VOICE` and widen `allowedCallingStart`/`allowedCallingEnd`
+to cover the time you are actually working — the window is read in the *tenant's*
+timezone, not the server's, so a UK evening is the middle of an Indian night and
+nothing will be dialled. Give a customer a policy with a premium due today, then
+`POST /api/reminders/detect`.
+
+A delivered call answers `{"created":1,"skipped":0,"sent":1}` and leaves a
+conversation with a transcript. `POST /api/conversations/{id}/analyse` then reads
+it the way the assistant would.
+
+If the response says `"sent":0`, the window is the first thing to check: the
+reminder stays `PENDING` and will go out when the window opens, which is the
+guard working rather than a failure.
 
 ## Common commands
 

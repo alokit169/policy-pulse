@@ -127,6 +127,40 @@ from.
 Only what the customer said is read. An agent asking "so you will pay on Friday?"
 is not a commitment, or the system could talk itself into one.
 
+## What the system may do on the phone
+
+Calls are placed by a scheduler, with nobody signed in, so nothing on that path
+reads a security context: every record written carries the tenant taken from the
+reminder rather than from a caller.
+
+Three things are checked before a number is dialled, and the telephony provider
+is trusted with none of them.
+
+**The calling window** is checked against the clock at the moment of dialling, in
+the tenant's own timezone — not when the reminder was queued. A reminder due at
+nine in the morning can be picked up hours late by a sweep that fell behind, and
+ringing a customer at eleven at night is the kind of mistake that ends an agency.
+A tenant sets its own window and a reminder outside it is left alone, not
+dropped.
+
+**The attempt limit** is the tenant's, and the count rises on every attempt
+whatever the outcome, so a provider that fails every call still runs out rather
+than dialling for ever. Past the limit the reminder is given up on and a
+`HumanTask` is raised for the customer's own agent, so unreachable work becomes
+somebody's instead of disappearing.
+
+**A number that cannot be dialled is not retried**, because trying again cannot
+help. It goes straight to a person.
+
+Consent is checked earlier still, at detection: an opted-out customer leaves no
+queued reminder at all, so there is nothing for a later run to act on by mistake.
+
+Phone numbers are masked in logs.
+
+> `app.voice.provider=twilio` selects a provider that is not implemented and
+> fails loudly. Silently placing no calls would be the failure noticed last:
+> reminders would keep being marked as attempted and nobody would ever be rung.
+
 ## Known gaps
 
 These are understood and deferred, not overlooked.
@@ -138,6 +172,7 @@ These are understood and deferred, not overlooked.
 | No per-account lockout | Rate limiting is per IP, so it does not stop a slow distributed guessing attack against one account |
 | Audit log is append-only but unreviewed | Nothing surfaces `LOGIN_FAILURE` patterns yet |
 | No MFA | Single factor only |
+| No real telephony provider | Calls are simulated; a live provider needs webhook signature checks and replay safety before it is wired in |
 
 ## Reporting
 

@@ -4,6 +4,7 @@ import com.policypulse.common.Domain;
 import com.policypulse.customers.Customer;
 import com.policypulse.customers.CustomerRepository;
 import com.policypulse.notifications.NotificationService;
+import com.policypulse.voice.CallService;
 import com.policypulse.policies.Policy;
 import com.policypulse.policies.PolicyRepository;
 import org.slf4j.Logger;
@@ -35,15 +36,24 @@ public class ReminderDispatchService {
     private final PolicyRepository policies;
     private final CustomerRepository customers;
     private final NotificationService notifications;
+    private final CallService calls;
+    private final ReminderConfigurations configurations;
     private final Clock clock;
+
+    /** One sweep never loads more than this, however much has backed up. */
+    private static final org.springframework.data.domain.Pageable BATCH =
+            org.springframework.data.domain.PageRequest.of(0, 200);
 
     public ReminderDispatchService(ReminderRepository reminders, PolicyRepository policies,
                                    CustomerRepository customers, NotificationService notifications,
+                                   CallService calls, ReminderConfigurations configurations,
                                    Clock clock) {
         this.reminders = reminders;
         this.policies = policies;
         this.customers = customers;
         this.notifications = notifications;
+        this.calls = calls;
+        this.configurations = configurations;
         this.clock = clock;
     }
 
@@ -53,10 +63,7 @@ public class ReminderDispatchService {
      */
     @Transactional(readOnly = true)
     public List<UUID> dueReminderIds() {
-        return reminders
-                .findTop200ByStatusAndScheduledAtBeforeOrderByScheduledAtAsc(
-                        Domain.ReminderStatus.PENDING, Instant.now(clock))
-                .stream()
+        return reminders.findDue(Instant.now(clock), BATCH).stream()
                 .map(Reminder::getId)
                 .toList();
     }
@@ -64,10 +71,7 @@ public class ReminderDispatchService {
     /** Due reminders for one tenant only. */
     @Transactional(readOnly = true)
     public List<UUID> dueReminderIdsFor(UUID organizationId) {
-        return reminders
-                .findTop200ByOrganizationIdAndStatusAndScheduledAtBeforeOrderByScheduledAtAsc(
-                        organizationId, Domain.ReminderStatus.PENDING, Instant.now(clock))
-                .stream()
+        return reminders.findDueForOrganization(organizationId, Instant.now(clock), BATCH).stream()
                 .map(Reminder::getId)
                 .toList();
     }
@@ -91,8 +95,12 @@ public class ReminderDispatchService {
             return Outcome.CANCELLED;
         }
 
+        if (reminder.getChannel() == Domain.Channel.VOICE) {
+            return placeCall(reminder);
+        }
+
         if (reminder.getChannel() != Domain.Channel.IN_APP) {
-            // Email, SMS and voice arrive with their providers in later phases.
+            // Email and SMS arrive with their providers in a later phase.
             // Leaving it pending is honest: nothing was sent.
             log.debug("Reminder {} is for {}, which has no provider yet",
                     reminder.getId(), reminder.getChannel());
@@ -106,6 +114,27 @@ public class ReminderDispatchService {
         reminder.setLastAttemptAt(Instant.now(clock));
         reminders.save(reminder);
         return Outcome.SENT;
+    }
+
+    /**
+     * Hands a voice reminder to the call service, which owns the calling window,
+     * the attempt limit and what to do when a number cannot be reached.
+     */
+    private Outcome placeCall(Reminder reminder) {
+        Customer customer = customers.findById(reminder.getCustomerId()).orElse(null);
+        if (customer == null) return Outcome.DEFERRED;
+
+        Policy policy = reminder.getPolicyId() == null ? null
+                : policies.findById(reminder.getPolicyId()).orElse(null);
+
+        return switch (calls.placeCall(reminder, customer, policy,
+                configurations.forOrganization(reminder.getOrganizationId()))) {
+            case ANSWERED -> Outcome.SENT;
+            // Left pending on purpose: another attempt is already scheduled, or
+            // the window has not opened yet and nothing was dialled.
+            case RETRY_SCHEDULED, OUTSIDE_WINDOW -> Outcome.DEFERRED;
+            case GIVEN_UP -> Outcome.CANCELLED;
+        };
     }
 
     private boolean mayStillContact(Reminder reminder) {

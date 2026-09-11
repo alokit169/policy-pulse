@@ -33,8 +33,8 @@ flowchart LR
 | `reminders` | Reminder entities, idempotent detection and per-tenant settings |
 | `notifications` | In-app messages per user + provider abstraction |
 | `ai` | AIProvider, intent, context, and the validation that bounds it |
-| `voice` | VoiceProvider, mock/Twilio stub |
-| `conversations` | Calls and transcripts, logged by a person for now |
+| `voice` | Placing calls: the calling window, attempt limits, and what a call leaves behind |
+| `conversations` | Calls and transcripts, written either by an agent or by a placed call |
 | `followups` | Commitments, owned by the customer's own agent |
 | `dashboard` | Aggregates and action-required, counted in the database |
 | `audit` | Audit log writer |
@@ -49,14 +49,20 @@ flowchart LR
 sequenceDiagram
   participant Sch as Scheduler
   participant Rem as ReminderService
+  participant Call as CallService
   participant Voice as VoiceProvider
+  participant Conv as Conversation
   participant AI as AIProvider
   participant Val as ActionValidationService
   participant Biz as FollowUp and Premium services
   Sch->>Rem: due reminders
-  Rem->>Rem: consent, call window, attempts
-  Rem->>Voice: initiateCall
-  Voice->>AI: transcript
+  Rem->>Rem: consent, at detection
+  Rem->>Call: a voice reminder
+  Call->>Call: calling window, attempts, a usable number
+  Call->>Voice: place the call
+  Voice->>Call: outcome and transcript
+  Call->>Conv: a conversation with the transcript
+  Conv->>AI: read on request
   AI->>Val: structured intent
   Val->>Biz: PAYMENT_COMMITMENT
   Biz->>Biz: FollowUp for next day
@@ -64,12 +70,16 @@ sequenceDiagram
 
 AI never writes `PremiumPayment.status = PAID`. `PAYMENT_CONFIRMED` creates pending verification and a HumanTask.
 
+A call is not retried for ever: past the tenant's attempt limit, or against a
+number that cannot be dialled, the reminder is given up on and a HumanTask is
+raised, so the work becomes somebody's rather than disappearing.
+
 ## Folder structure
 
 ```
 backend/src/main/java/com/policypulse/...
 frontend/src/pages/...
-docs via README, LOCAL_DEVELOPMENT, DATABASE, API, AI_ARCHITECTURE, VOICE, SECURITY, DEPLOYMENT
+docs via README, LOCAL_DEVELOPMENT, DATABASE, SECURITY
 ```
 
 ## Dependencies

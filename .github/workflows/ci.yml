@@ -293,6 +293,83 @@ jobs:
             failed=1
           fi
 
+          # Voice. The calling window is the one guard that cannot be tested by
+          # picking a convenient time, because CI runs whenever it runs, so both
+          # halves are derived from the tenant's own clock.
+          TENANT_TZ=$(curl -s -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/configuration \
+                      | sed -n 's/.*"timezone":"\([^"]*\)".*/\1/p')
+          TENANT_TODAY=$(TZ="$TENANT_TZ" date +%Y-%m-%d)
+
+          # A window that started at midnight and closed at the top of the current
+          # minute. The reminder is therefore queued for a moment in the past, so
+          # dispatch picks it up, and the call is refused for the one reason being
+          # tested rather than because nothing was due yet.
+          WINDOW_END=$(TZ="$TENANT_TZ" date +%H:%M:00)
+          if [ "$WINDOW_END" = "00:00:00" ]; then WINDOW_END="00:00:01"; fi
+
+          voice_config() {
+            check "$1" 200 -X PUT http://localhost:5173/api/reminders/configuration \
+                           -H "$ADMIN_AUTH" -H "$JSON" \
+                           -d "{\"daysBeforeDue\":\"0\",\"daysAfterDue\":\"2\",\"maxCallAttempts\":3,\"retryDelayMinutes\":60,\"allowedCallingStart\":\"00:00:00\",\"allowedCallingEnd\":\"$2\",\"preferredChannel\":\"VOICE\"}"
+          }
+
+          voice_config "close the calling window" "$WINDOW_END"
+
+          # A number ending in 7, which the mock provider answers. Endings 0, 1
+          # and 2 are its no-answer, busy and unusable cases.
+          VOICE_CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
+                             -H "$AUTH" -H "$JSON" \
+                             -d "{\"firstName\":\"Voice\",\"lastName\":\"Target\",\"phone\":\"${PHONE}7\"}" \
+                           | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          curl -s -o /dev/null -X POST http://localhost:5173/api/policies \
+            -H "$AUTH" -H "$JSON" \
+            -d "{\"customerId\":\"$VOICE_CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"4500.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"$TENANT_TODAY\",\"policyEndDate\":\"$TENANT_TODAY\"}"
+
+          SHUT=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect)
+          if echo "$SHUT" | grep -q '"created":0'; then
+            echo "FAIL  no voice reminder was raised to test the window with: $SHUT"
+            failed=1
+          elif echo "$SHUT" | grep -q '"sent":0'; then
+            echo "ok    nobody was called outside the calling window"
+          else
+            echo "FAIL  a call was placed outside the calling window: $SHUT"
+            failed=1
+          fi
+
+          # Same reminder, window now open: it must go through, and exactly once.
+          voice_config "open the calling window" "23:59:00"
+
+          OPEN=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect)
+          if echo "$OPEN" | grep -q '"sent":0'; then
+            echo "FAIL  the reminder was not delivered once the window opened: $OPEN"
+            docker compose logs backend --tail=40
+            failed=1
+          else
+            echo "ok    the reminder was placed as a call once the window opened"
+          fi
+
+          # Only a call writes a conversation against a reminder, so this cannot
+          # be satisfied by the conversations logged by hand further up.
+          CALL=$(curl -s -H "$ADMIN_AUTH" 'http://localhost:5173/api/conversations?size=50' \
+                 | sed 's/},{/}\n{/g' \
+                 | grep '"reminderId":"[0-9a-f]' \
+                 | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+          if [ -z "$CALL" ]; then
+            echo "FAIL  the call left no conversation"
+            failed=1
+          else
+            echo "ok    the call was recorded as a conversation"
+            # The transcript is what the assistant reads, so an empty one would
+            # make the whole voice path useless while still looking healthy.
+            TRANSCRIPT=$(curl -s -H "$ADMIN_AUTH" "http://localhost:5173/api/conversations/$CALL")
+            if echo "$TRANSCRIPT" | grep -q '"sender":"CUSTOMER"'; then
+              echo "ok    the call transcript records what the customer said"
+            else
+              echo "FAIL  the call left no customer line in the transcript: $TRANSCRIPT"
+              failed=1
+            fi
+          fi
+
           exit $failed
 
       - name: Dump logs on failure

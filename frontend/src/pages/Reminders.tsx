@@ -173,7 +173,14 @@ export default function Reminders() {
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0">
                 <td className="px-4 py-3 text-slate-700">{label(r.reminderType)}</td>
-                <td className="px-4 py-3 text-slate-700">{when(r.scheduledAt)}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {when(r.scheduledAt)}
+                  {r.nextAttemptAt && (
+                    <span className="block text-xs text-slate-500">
+                      Trying again {when(r.nextAttemptAt)}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-600">{label(r.channel)}</td>
                 <td className="px-4 py-3 text-slate-600">{r.attemptCount}</td>
                 <td className="px-4 py-3">
