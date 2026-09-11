@@ -21,6 +21,8 @@ public record DashboardResponse(
         long activeCustomers,
         long activePolicies,
         long pendingReminders,
+        /** Commitments whose moment has passed and that nobody has closed. */
+        long followUpsDue,
         Money overdue,
         Money dueNextSevenDays,
         Money collectedThisMonth,

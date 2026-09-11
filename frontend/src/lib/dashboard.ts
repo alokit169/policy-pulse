@@ -28,6 +28,8 @@ export type Dashboard = {
   activeCustomers: number
   activePolicies: number
   pendingReminders: number
+  /** Commitments past their moment that nobody has closed. */
+  followUpsDue: number
   overdue: Money
   dueNextSevenDays: Money
   collectedThisMonth: Money

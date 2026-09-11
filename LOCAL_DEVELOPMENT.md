@@ -153,7 +153,9 @@ performs. Docker must be running.
 | `ReminderOffsetsTest` | Parsing the configured day offsets |
 | `ReminderApiTest` | Settings permissions, validation, notification ownership |
 | `FixedClockTest` | The suite really is running against a frozen clock |
-| `DashboardTest` | Aggregates, agent and tenant scoping, per-currency money |
+| `DashboardTest` | Aggregates, agent and tenant scoping, rupee totals |
+| `ConversationTest` | Transcripts, closing, tenant and agent visibility |
+| `FollowUpTest` | Commitments, ownership, timezone-aware due moments |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 

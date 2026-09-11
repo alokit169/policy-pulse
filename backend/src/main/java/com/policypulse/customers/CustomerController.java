@@ -32,11 +32,17 @@ import java.util.UUID;
 public class CustomerController {
     private final CustomerService customerService;
     private final com.policypulse.policies.PolicyService policyService;
+    private final com.policypulse.conversations.ConversationService conversationService;
+    private final com.policypulse.followups.FollowUpService followUpService;
 
     public CustomerController(CustomerService customerService,
-                              com.policypulse.policies.PolicyService policyService) {
+                              com.policypulse.policies.PolicyService policyService,
+                              com.policypulse.conversations.ConversationService conversationService,
+                              com.policypulse.followups.FollowUpService followUpService) {
         this.customerService = customerService;
         this.policyService = policyService;
+        this.conversationService = conversationService;
+        this.followUpService = followUpService;
     }
 
     @GetMapping
@@ -80,6 +86,18 @@ public class CustomerController {
     @Operation(summary = "Policies held by this customer")
     public java.util.List<com.policypulse.policies.PolicyResponse> policies(@PathVariable UUID id) {
         return policyService.forCustomer(id);
+    }
+
+    @GetMapping("/{id}/conversations")
+    @Operation(summary = "Conversations held with this customer")
+    public java.util.List<com.policypulse.conversations.ConversationResponse> conversations(@PathVariable UUID id) {
+        return conversationService.forCustomer(id);
+    }
+
+    @GetMapping("/{id}/follow-ups")
+    @Operation(summary = "Follow-ups outstanding for this customer")
+    public java.util.List<com.policypulse.followups.FollowUpResponse> followUps(@PathVariable UUID id) {
+        return followUpService.forCustomer(id);
     }
 
     @PostMapping("/{id}/restore")

@@ -7,6 +7,7 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -171,6 +172,25 @@ public interface DashboardRepository extends Repository<PremiumPayment, UUID> {
               AND r.status = com.policypulse.common.Domain$ReminderStatus.PENDING
             """)
     long pendingRemindersForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId);
+
+    @Query("""
+            SELECT COUNT(f) FROM FollowUp f
+            WHERE f.organizationId = :org
+              AND f.status IN (com.policypulse.common.Domain$FollowUpStatus.OPEN,
+                               com.policypulse.common.Domain$FollowUpStatus.DUE)
+              AND f.dueAt < :now
+            """)
+    long followUpsDueForOrganization(@Param("org") UUID organizationId, @Param("now") Instant now);
+
+    @Query("""
+            SELECT COUNT(f) FROM FollowUp f
+            WHERE f.organizationId = :org AND f.assignedAgentId = :agent
+              AND f.status IN (com.policypulse.common.Domain$FollowUpStatus.OPEN,
+                               com.policypulse.common.Domain$FollowUpStatus.DUE)
+              AND f.dueAt < :now
+            """)
+    long followUpsDueForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
+                              @Param("now") Instant now);
 
     @Query("""
             SELECT COUNT(c) FROM Customer c

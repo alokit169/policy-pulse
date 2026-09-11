@@ -232,6 +232,33 @@ jobs:
             failed=1
           fi
 
+          # Conversations and follow-ups.
+          check "conversation list" 200 -H "$AUTH" http://localhost:5173/api/conversations
+          check "follow-up list"    200 -H "$AUTH" http://localhost:5173/api/follow-ups
+
+          CONV=$(curl -s -X POST http://localhost:5173/api/conversations \
+                   -H "$AUTH" -H "$JSON" \
+                   -d "{\"customerId\":\"$CUSTOMER\",\"channel\":\"VOICE\",\"direction\":\"OUTBOUND\"}" \
+                 | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          if [ -z "$CONV" ]; then
+            echo "FAIL  could not log a conversation"; exit 1
+          fi
+
+          check "add a line"        201 -X POST "http://localhost:5173/api/conversations/$CONV/messages" \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d '{"sender":"CUSTOMER","message":"I will pay on Friday."}'
+          check "commitment needs a date" 400 -X POST http://localhost:5173/api/follow-ups \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"$CUSTOMER\",\"reason\":\"PAYMENT_COMMITMENT\"}"
+          check "record commitment" 201 -X POST http://localhost:5173/api/follow-ups \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"$CUSTOMER\",\"conversationId\":\"$CONV\",\"reason\":\"PAYMENT_COMMITMENT\",\"commitmentDate\":\"2099-01-01\"}"
+          check "close conversation" 200 -X POST "http://localhost:5173/api/conversations/$CONV/close" \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d '{"outcome":"PAYMENT_COMMITMENT"}'
+          check "closed stays closed" 409 -X POST "http://localhost:5173/api/conversations/$CONV/close" \
+                                        -H "$AUTH" -H "$JSON" -d '{}'
+
           exit $failed
 
       - name: Dump logs on failure

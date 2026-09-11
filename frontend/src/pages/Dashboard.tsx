@@ -128,11 +128,18 @@ export default function Dashboard() {
       <section className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Action required</h2>
-          {data.pendingReminders > 0 && (
-            <Link to="/reminders" className="text-sm text-blue-600 hover:underline">
-              {data.pendingReminders} reminder{data.pendingReminders === 1 ? '' : 's'} waiting to go out
-            </Link>
-          )}
+          <div className="flex flex-wrap gap-4 text-sm">
+            {data.followUpsDue > 0 && (
+              <Link to="/follow-ups" className="text-blue-600 hover:underline">
+                {data.followUpsDue} follow-up{data.followUpsDue === 1 ? '' : 's'} past due
+              </Link>
+            )}
+            {data.pendingReminders > 0 && (
+              <Link to="/reminders" className="text-blue-600 hover:underline">
+                {data.pendingReminders} reminder{data.pendingReminders === 1 ? '' : 's'} waiting to go out
+              </Link>
+            )}
+          </div>
         </div>
 
         {data.actionRequired.length === 0 ? (

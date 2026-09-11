@@ -12,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -28,10 +30,12 @@ public class DashboardService {
 
     private final DashboardRepository dashboard;
     private final OrganizationZones zones;
+    private final Clock clock;
 
-    public DashboardService(DashboardRepository dashboard, OrganizationZones zones) {
+    public DashboardService(DashboardRepository dashboard, OrganizationZones zones, Clock clock) {
         this.dashboard = dashboard;
         this.zones = zones;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +84,9 @@ public class DashboardService {
                 ownBookOnly
                         ? dashboard.pendingRemindersForAgent(orgId, agentId)
                         : dashboard.pendingRemindersForOrganization(orgId),
+                ownBookOnly
+                        ? dashboard.followUpsDueForAgent(orgId, agentId, Instant.now(clock))
+                        : dashboard.followUpsDueForOrganization(orgId, Instant.now(clock)),
                 overdue,
                 dueSoon,
                 collected,

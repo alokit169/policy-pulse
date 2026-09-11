@@ -5,6 +5,8 @@ import com.policypulse.FixedClockConfiguration;
 import com.policypulse.common.Domain;
 import com.policypulse.customers.Customer;
 import com.policypulse.customers.CustomerRepository;
+import com.policypulse.followups.FollowUp;
+import com.policypulse.followups.FollowUpRepository;
 import com.policypulse.organizations.Organization;
 import com.policypulse.policies.Policy;
 import com.policypulse.policies.PolicyRepository;
@@ -36,6 +38,7 @@ class DashboardTest extends AbstractIntegrationTest {
     @Autowired private CustomerRepository customers;
     @Autowired private PolicyRepository policies;
     @Autowired private PremiumPaymentRepository premiums;
+    @Autowired private FollowUpRepository followUps;
 
     /** The tenant's own date, matching what the service computes. */
     private LocalDate today(String timezone) {
@@ -107,6 +110,7 @@ class DashboardTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.activeCustomers").value(0))
                 .andExpect(jsonPath("$.activePolicies").value(0))
                 .andExpect(jsonPath("$.overdue.count").value(0))
+                .andExpect(jsonPath("$.followUpsDue").value(0))
                 .andExpect(jsonPath("$.overdue.amount").value(0))
                 .andExpect(jsonPath("$.collectedThisMonth.amount").value(0))
                 .andExpect(jsonPath("$.actionRequired").isEmpty());
@@ -284,5 +288,46 @@ class DashboardTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.timezone").value(behind))
                 .andExpect(jsonPath("$.asOf").value(today(behind).toString()))
                 .andExpect(jsonPath("$.overdue.count").value(0));
+    }
+
+    /**
+     * A commitment whose moment has passed and that nobody has closed is
+     * outstanding work, so it belongs on the dashboard next to overdue premiums.
+     */
+    @Test
+    void commitmentsPastTheirMomentAreCounted() throws Exception {
+        Organization org = tenantOn("UTC");
+        AppUser agent = agentIn(org);
+        Customer customer = customerOf(agent);
+
+        FollowUp missed = new FollowUp();
+        missed.setOrganizationId(org.getId());
+        missed.setCustomerId(customer.getId());
+        missed.setAssignedAgentId(agent.getId());
+        missed.setReason("PAYMENT_COMMITMENT");
+        missed.setDueAt(FixedClockConfiguration.FIXED_NOW.minusSeconds(3600));
+        missed.setStatus(Domain.FollowUpStatus.OPEN);
+        followUps.save(missed);
+
+        FollowUp stillAhead = new FollowUp();
+        stillAhead.setOrganizationId(org.getId());
+        stillAhead.setCustomerId(customer.getId());
+        stillAhead.setAssignedAgentId(agent.getId());
+        stillAhead.setReason("CALLBACK_REQUESTED");
+        stillAhead.setDueAt(FixedClockConfiguration.FIXED_NOW.plusSeconds(3600));
+        stillAhead.setStatus(Domain.FollowUpStatus.OPEN);
+        followUps.save(stillAhead);
+
+        FollowUp alreadyDone = new FollowUp();
+        alreadyDone.setOrganizationId(org.getId());
+        alreadyDone.setCustomerId(customer.getId());
+        alreadyDone.setAssignedAgentId(agent.getId());
+        alreadyDone.setReason("OTHER");
+        alreadyDone.setDueAt(FixedClockConfiguration.FIXED_NOW.minusSeconds(7200));
+        alreadyDone.setStatus(Domain.FollowUpStatus.COMPLETED);
+        followUps.save(alreadyDone);
+
+        mvc.perform(get("/api/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(agent)))
+                .andExpect(jsonPath("$.followUpsDue").value(1));
     }
 }

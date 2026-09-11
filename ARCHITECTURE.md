@@ -34,8 +34,8 @@ flowchart LR
 | `notifications` | In-app messages per user + provider abstraction |
 | `ai` | AIProvider, intent, context, validation |
 | `voice` | VoiceProvider, mock/Twilio stub |
-| `conversations` | Calls, transcripts, messages |
-| `followups` | Commitments and HumanTask |
+| `conversations` | Calls and transcripts, logged by a person for now |
+| `followups` | Commitments, owned by the customer's own agent |
 | `dashboard` | Aggregates and action-required, counted in the database |
 | `audit` | Audit log writer |
 | `reports` | CSV/report queries |

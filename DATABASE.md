@@ -16,6 +16,7 @@ Migrations live in `backend/src/main/resources/db/migration` and are named
 | `V5__premium_optimistic_locking` | `premium_payments.version` |
 | `V6__reminder_queries` | Indexes for reminder listing, detection and unread counts |
 | `V7__single_currency` | Rupees only, enforced by a check constraint |
+| `V8__conversations_and_followups` | Indexes for transcripts, listings and an agent's own work |
 
 ### Rules
 
@@ -84,8 +85,13 @@ policies and premium history reference them.
 | Table | Notes |
 | --- | --- |
 | `reminders` | Detected work, scheduled per configuration. Unique `idempotency_key` |
-| `conversations`, `conversation_messages` | Calls and transcripts |
+| `conversations`, `conversation_messages` | Calls and transcripts. A message names its sender from a closed set |
 | `follow_ups`, `human_tasks` | Commitments and work requiring a person |
+
+A follow-up belongs to the agent who owns the customer, not to whoever logged the
+call, so recording someone else's commitment does not hand them the work. Its
+`due_at` is the start of the working day in the tenant's own timezone on the date
+the customer named.
 | `in_app_notifications` | Delivered in the UI |
 
 Reminder detection runs on a timer, so it will be run again over the same data.

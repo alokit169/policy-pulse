@@ -5,9 +5,12 @@ import { useAuth } from './lib/auth'
 import { unreadCount } from './lib/notifications'
 import Notifications from './pages/Notifications'
 import Reminders from './pages/Reminders'
+import ConversationDetail from './pages/ConversationDetail'
+import Conversations from './pages/Conversations'
 import CustomerForm from './pages/CustomerForm'
 import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
+import FollowUps from './pages/FollowUps'
 import Policies from './pages/Policies'
 import PolicyForm from './pages/PolicyForm'
 import Login from './pages/Login'
@@ -20,6 +23,8 @@ const NAV = [
   { to: '/customers', label: 'Customers' },
   { to: '/policies', label: 'Policies' },
   { to: '/reminders', label: 'Reminders' },
+  { to: '/conversations', label: 'Conversations' },
+  { to: '/follow-ups', label: 'Follow-ups' },
 ]
 
 /**
@@ -139,6 +144,9 @@ export default function App() {
           <Route path="/policies/:id" element={<PolicyForm />} />
           <Route path="/reminders" element={<Reminders />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/conversations" element={<Conversations />} />
+          <Route path="/conversations/:id" element={<ConversationDetail />} />
+          <Route path="/follow-ups" element={<FollowUps />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>
