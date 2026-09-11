@@ -156,6 +156,32 @@ public class PremiumService {
         return PremiumResponse.of(instalment);
     }
 
+    /**
+     * Clears a claim the assistant flagged, without paying anything.
+     *
+     * <p>The other half of the rule that the assistant may never record money as
+     * received. A person checks the books and either records the payment properly,
+     * which marks it paid, or dismisses the claim here, which leaves the instalment
+     * exactly as it was.
+     */
+    @Transactional
+    public PremiumResponse dismissVerification(UUID policyId, UUID premiumId) {
+        AuthUser caller = SecurityUtil.current();
+        Policy policy = requireVisiblePolicy(policyId);
+
+        PremiumPayment instalment = premiums.findByIdAndOrganizationId(premiumId, caller.getOrganizationId())
+                .filter(p -> p.getPolicyId().equals(policyId))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Premium not found"));
+
+        instalment.setVerificationPending(false);
+        premiums.save(instalment);
+        refreshPolicyDates(policy);
+
+        audit.record(AuditAction.PREMIUM_VERIFICATION_RESOLVED, ENTITY, instalment.getId().toString(),
+                caller.getOrganizationId(), caller.getId(), caller.getUsername(), "dismissed");
+        return PremiumResponse.of(instalment);
+    }
+
     @Transactional
     public PremiumResponse waive(UUID policyId, UUID premiumId) {
         AuthUser caller = SecurityUtil.current();

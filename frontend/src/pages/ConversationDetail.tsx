@@ -9,6 +9,8 @@ import {
   getConversation,
 } from '../lib/engagement'
 import type { Conversation, FollowUpReason, MessageSender } from '../lib/engagement'
+import { analyseConversation } from '../lib/tasks'
+import type { Analysis } from '../lib/tasks'
 
 const SENDERS: MessageSender[] = ['AGENT', 'CUSTOMER', 'SYSTEM']
 
@@ -56,6 +58,7 @@ export default function ConversationDetail() {
   const [outcome, setOutcome] = useState('')
   const [summary, setSummary] = useState('')
 
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [reason, setReason] = useState<FollowUpReason>('PAYMENT_COMMITMENT')
   const [commitmentDate, setCommitmentDate] = useState('')
 
@@ -134,6 +137,21 @@ export default function ConversationDetail() {
     }
   }
 
+  async function onAnalyse() {
+    if (!id) return
+    setError(null)
+    setNotice(null)
+    setBusy(true)
+    try {
+      setAnalysis(await analyseConversation(id))
+      await reload()
+    } catch (err) {
+      setError(errorMessage(err, 'Could not analyse the conversation'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>
 
   if (!conversation) {
@@ -176,6 +194,54 @@ export default function ConversationDetail() {
       {notice && (
         <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</p>
       )}
+
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Assistant</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Reads the transcript and does only what the rules allow. It never records a payment.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void onAnalyse()}
+            disabled={busy || !conversation.messages || conversation.messages.length === 0}
+            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+          >
+            Analyse
+          </button>
+        </div>
+
+        {analysis && (
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+                {label(analysis.intent)}
+              </span>
+              <span className="text-xs text-slate-500">
+                {Math.round(analysis.confidence * 100)}% confident · {analysis.provider}
+              </span>
+              {/* Whether it acted is stated in words, not left to a colour. */}
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  analysis.acted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                }`}
+              >
+                {analysis.acted ? 'acted' : 'passed to a person'}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-slate-800">{analysis.decision}</p>
+            {analysis.actions.length > 0 && (
+              <ul className="mt-2 list-inside list-disc text-xs text-slate-600">
+                {analysis.actions.map((a) => (
+                  <li key={a}>{label(a)}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="mt-6">
         <h2 className="text-lg font-semibold tracking-tight">Transcript</h2>

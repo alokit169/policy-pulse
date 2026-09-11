@@ -17,6 +17,7 @@ Migrations live in `backend/src/main/resources/db/migration` and are named
 | `V6__reminder_queries` | Indexes for reminder listing, detection and unread counts |
 | `V7__single_currency` | Rupees only, enforced by a check constraint |
 | `V8__conversations_and_followups` | Indexes for transcripts, listings and an agent's own work |
+| `V9__ai_review` | Indexes for the task queue and for claims awaiting a person |
 
 ### Rules
 

@@ -100,6 +100,33 @@ instrument if the signing key itself is ever exposed.
 password. docker compose sets it for local runs. **Never enable it outside
 development.**
 
+## What the assistant is allowed to do
+
+A model reads transcripts and says what it thinks was meant. It is a source of
+opinion, not of authority: everything it produces passes through the validation
+layer before anything is written.
+
+**It never records money as received.** A customer saying they have paid is a
+claim. The instalment is flagged for verification and a person is asked to check
+it against the books; the status is untouched. A person then either records the
+payment properly or dismisses the claim.
+
+**Below a confidence threshold it does nothing but ask for help**, and changing a
+customer's own record needs a higher bar again.
+
+**What it may do unattended only ever reduces what the system does** — stopping
+contact after an opt-out, or scheduling a callback. Those are safe in the
+direction they fail: the cost of being wrong is a missed reminder, not a wrong
+balance.
+
+It is never given identifiers or contact details, only what is needed to read the
+call, so a logged prompt cannot leak them. It is never asked which record it is
+talking about; the system already knows, from the conversation the transcript came
+from.
+
+Only what the customer said is read. An agent asking "so you will pay on Friday?"
+is not a commitment, or the system could talk itself into one.
+
 ## Known gaps
 
 These are understood and deferred, not overlooked.

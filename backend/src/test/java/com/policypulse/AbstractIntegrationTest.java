@@ -25,7 +25,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, FixedClockConfiguration.class})
+@Import({TestcontainersConfiguration.class, FixedClockConfiguration.class,
+        com.policypulse.ai.StubAiConfiguration.class})
 public abstract class AbstractIntegrationTest {
 
     protected static final String TEST_PASSWORD = "Password123!";

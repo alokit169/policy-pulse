@@ -88,6 +88,12 @@ public class PolicyController {
                 request == null ? new RecordPaymentRequest(null, null, null) : request);
     }
 
+    @PostMapping("/{id}/premiums/{premiumId}/dismiss-claim")
+    @Operation(summary = "Dismiss a claimed payment without recording one")
+    public PremiumResponse dismissClaim(@PathVariable UUID id, @PathVariable UUID premiumId) {
+        return premiumService.dismissVerification(id, premiumId);
+    }
+
     @PostMapping("/{id}/premiums/{premiumId}/waive")
     @Operation(summary = "Waive a premium that will not be collected")
     public PremiumResponse waive(@PathVariable UUID id, @PathVariable UUID premiumId) {

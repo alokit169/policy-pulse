@@ -12,6 +12,7 @@ import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
 import FollowUps from './pages/FollowUps'
 import Policies from './pages/Policies'
+import Tasks from './pages/Tasks'
 import PolicyForm from './pages/PolicyForm'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
@@ -25,6 +26,7 @@ const NAV = [
   { to: '/reminders', label: 'Reminders' },
   { to: '/conversations', label: 'Conversations' },
   { to: '/follow-ups', label: 'Follow-ups' },
+  { to: '/tasks', label: 'Tasks' },
 ]
 
 /**
@@ -147,6 +149,7 @@ export default function App() {
           <Route path="/conversations" element={<Conversations />} />
           <Route path="/conversations/:id" element={<ConversationDetail />} />
           <Route path="/follow-ups" element={<FollowUps />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>

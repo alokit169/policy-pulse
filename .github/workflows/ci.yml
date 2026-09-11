@@ -259,6 +259,40 @@ jobs:
           check "closed stays closed" 409 -X POST "http://localhost:5173/api/conversations/$CONV/close" \
                                         -H "$AUTH" -H "$JSON" -d '{}'
 
+          # The assistant, and the rule it exists inside: a claimed payment must
+          # never be recorded as received.
+          check "task list"         200 -H "$AUTH" http://localhost:5173/api/tasks
+
+          AI_POLICY=$(curl -s -X POST http://localhost:5173/api/policies \
+                        -H "$AUTH" -H "$JSON" \
+                        -d "{\"customerId\":\"$CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"250.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"2020-01-01\",\"policyEndDate\":\"2021-01-01\"}" \
+                      | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          AI_PREMIUM=$(curl -s -H "$AUTH" "http://localhost:5173/api/policies/$AI_POLICY/premiums" \
+                       | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+
+          AI_CONV=$(curl -s -X POST http://localhost:5173/api/conversations \
+                      -H "$AUTH" -H "$JSON" \
+                      -d "{\"customerId\":\"$CUSTOMER\",\"policyId\":\"$AI_POLICY\",\"channel\":\"VOICE\",\"direction\":\"OUTBOUND\"}" \
+                    | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          curl -s -o /dev/null -X POST "http://localhost:5173/api/conversations/$AI_CONV/messages" \
+            -H "$AUTH" -H "$JSON" -d '{"sender":"CUSTOMER","message":"I have paid already."}'
+
+          check "analyse a call"    200 -X POST "http://localhost:5173/api/conversations/$AI_CONV/analyse" -H "$AUTH"
+
+          AFTER=$(curl -s -H "$AUTH" "http://localhost:5173/api/policies/$AI_POLICY/premiums")
+          if echo "$AFTER" | grep -q '"status":"PAID"'; then
+            echo "FAIL  a claimed payment was recorded as received: $AFTER"
+            failed=1
+          else
+            echo "ok    a claimed payment was not recorded as received"
+          fi
+          if echo "$AFTER" | grep -q '"verificationPending":true'; then
+            echo "ok    the instalment was flagged for a person to check"
+          else
+            echo "FAIL  the claim was not flagged for checking: $AFTER"
+            failed=1
+          fi
+
           exit $failed
 
       - name: Dump logs on failure

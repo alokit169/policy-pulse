@@ -162,8 +162,12 @@ public class ConversationService {
     /**
      * A conversation in another tenant, or one held by another agent, is reported
      * as missing rather than forbidden.
+     *
+     * <p>Public so analysis reuses exactly these rules rather than restating them,
+     * which would let the two drift apart and open a way to reach a call the
+     * caller could not otherwise see.
      */
-    Conversation loadVisible(UUID id) {
+    public Conversation loadVisible(UUID id) {
         AuthUser caller = SecurityUtil.current();
         Conversation conversation = conversations.findByIdAndOrganizationId(id, caller.getOrganizationId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Conversation not found"));

@@ -156,6 +156,8 @@ performs. Docker must be running.
 | `DashboardTest` | Aggregates, agent and tenant scoping, rupee totals |
 | `ConversationTest` | Transcripts, closing, tenant and agent visibility |
 | `FollowUpTest` | Commitments, ownership, timezone-aware due moments |
+| `AiSafetyTest` | What the assistant may cause, and above all what it may not |
+| `MockAIProviderTest` | Intent rules, including that only the customer is read |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 

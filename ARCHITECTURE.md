@@ -32,7 +32,7 @@ flowchart LR
 | `premiums` | Instalment schedules and recorded payments |
 | `reminders` | Reminder entities, idempotent detection and per-tenant settings |
 | `notifications` | In-app messages per user + provider abstraction |
-| `ai` | AIProvider, intent, context, validation |
+| `ai` | AIProvider, intent, context, and the validation that bounds it |
 | `voice` | VoiceProvider, mock/Twilio stub |
 | `conversations` | Calls and transcripts, logged by a person for now |
 | `followups` | Commitments, owned by the customer's own agent |
