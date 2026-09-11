@@ -86,16 +86,37 @@ jobs:
           done
           echo "backend did not become healthy"; docker compose logs --tail=100; exit 1
 
+      # Every check reports expected against actual, so a failure here names the
+      # broken route instead of only failing the step.
       - name: Smoke test through the UI origin
         run: |
-          set -e
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/actuator/health)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/v3/api-docs)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/api/customers)" = "401"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:5173/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"nobody@test.local\",\"password\":\"wrong\"}')" = "401"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:5173/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"agent@demo.local\",\"password\":\"Password123!\"}')" = "200"
-          echo "smoke tests passed"
+          set -uo pipefail
+          failed=0
+          check() {
+            desc=$1; expected=$2; shift 2
+            actual=$(curl -s -o /dev/null -w '%{http_code}' "$@")
+            if [ "$actual" = "$expected" ]; then
+              echo "ok    $desc ($actual)"
+            else
+              echo "FAIL  $desc: expected $expected, got $actual"
+              failed=1
+            fi
+          }
+
+          JSON='Content-Type: application/json'
+          check "SPA root"          200 http://localhost:5173/
+          check "SPA deep link"     200 http://localhost:5173/some/client/route
+          check "health"            200 http://localhost:5173/actuator/health
+          check "api docs"          200 http://localhost:5173/v3/api-docs
+          check "protected api"     401 http://localhost:5173/api/customers
+          check "bad credentials"   401 -X POST http://localhost:5173/api/auth/login \
+                                        -H "$JSON" \
+                                        -d '{"email":"nobody@test.local","password":"wrong"}'
+          check "seeded demo login" 200 -X POST http://localhost:5173/api/auth/login \
+                                        -H "$JSON" \
+                                        -d '{"email":"agent@demo.local","password":"Password123!"}'
+
+          exit $failed
 
       - name: Dump logs on failure
         if: failure()
