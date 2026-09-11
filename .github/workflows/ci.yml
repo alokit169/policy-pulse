@@ -206,6 +206,28 @@ jobs:
             failed=1
           fi
 
+          # Dashboard.
+          check "dashboard"         200 -H "$AUTH" http://localhost:5173/api/dashboard
+
+          # Money totals must be reported per currency, never summed across them.
+          DASH=$(curl -s -H "$ADMIN_AUTH" http://localhost:5173/api/dashboard)
+          if echo "$DASH" | grep -q '"amounts":\[' && echo "$DASH" | grep -q '"currencyCode"'; then
+            echo "ok    dashboard reports money per currency"
+          else
+            echo "FAIL  dashboard money is not grouped by currency: $DASH"
+            failed=1
+          fi
+
+          # An agent's dashboard is their own book, not the organization's.
+          SCOPE=$(curl -s -H "$AUTH" http://localhost:5173/api/dashboard \
+                  | sed -n 's/.*"scope":"\([^"]*\)".*/\1/p')
+          if [ "$SCOPE" = "OWN_BOOK" ]; then
+            echo "ok    agent dashboard is scoped to their own book"
+          else
+            echo "FAIL  agent dashboard scope was '$SCOPE', expected OWN_BOOK"
+            failed=1
+          fi
+
           exit $failed
 
       - name: Dump logs on failure

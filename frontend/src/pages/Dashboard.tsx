@@ -1,71 +1,207 @@
 import { useEffect, useState } from 'react'
-import { fetchHealth } from '../lib/health'
+import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { getDashboard } from '../lib/dashboard'
+import type { CurrencyAmount, Dashboard as DashboardData, Money } from '../lib/dashboard'
+import { formatMoney } from '../lib/policies'
 
-type Status = { state: 'loading' } | { state: 'up'; detail: string } | { state: 'down'; detail: string }
+/**
+ * The data's job here is magnitude and headline figures, so these are stat tiles
+ * rather than charts. One hero figure leads the view; the rest are equal-weight
+ * tiles.
+ */
+function StatTile({
+  label,
+  children,
+  footnote,
+}: {
+  label: string
+  children: ReactNode
+  footnote?: string
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <p className="text-sm text-slate-500">{label}</p>
+      <div className="mt-1 text-2xl font-semibold text-slate-900">{children}</div>
+      {footnote && <p className="mt-1 text-xs text-slate-500">{footnote}</p>}
+    </div>
+  )
+}
 
-// Phase 2 placeholder: real aggregates arrive in the dashboard phase.
+/**
+ * Currencies are listed separately, never summed. A tenant can hold rupee and
+ * dollar policies at once and one combined figure would be meaningless.
+ */
+function Amounts({ amounts, emptyLabel = '—' }: { amounts: CurrencyAmount[]; emptyLabel?: string }) {
+  if (amounts.length === 0) return <span className="text-slate-400">{emptyLabel}</span>
+  return (
+    <span>
+      {amounts.map((a, index) => (
+        <span key={a.currencyCode}>
+          {index > 0 && <span className="mx-1 text-slate-300">·</span>}
+          {formatMoney(a.amount, a.currencyCode)}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function countLabel(money: Money, noun: string): string {
+  return `${money.count} ${money.count === 1 ? noun : `${noun}s`}`
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
-  const [status, setStatus] = useState<Status>({ state: 'loading' })
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    fetchHealth()
-      .then((h) => {
-        if (!cancelled) setStatus({ state: 'up', detail: h.status })
+    getDashboard()
+      .then((d) => {
+        if (!cancelled) setData(d)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setStatus({ state: 'down', detail: err instanceof Error ? err.message : 'Unreachable' })
+        if (!cancelled) setError(errorMessage(err, 'Could not load the dashboard'))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
     }
   }, [])
 
-  const dotClass =
-    status.state === 'up'
-      ? 'bg-emerald-500'
-      : status.state === 'down'
-        ? 'bg-red-500'
-        : 'bg-slate-300'
+  if (loading) return <p className="text-sm text-slate-500">Loading…</p>
+
+  if (error || !data) {
+    return (
+      <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        {error ?? 'Could not load the dashboard'}
+      </p>
+    )
+  }
+
+  const owning = data.scope === 'OWN_BOOK'
+  const nothingOverdue = data.overdue.count === 0
 
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Signed in as {user?.email}. Customers, policies, premiums and reminders land in later phases.
+        {user?.name} · {owning ? 'your customers and policies' : 'the whole organization'} · as of{' '}
+        {data.asOf} ({data.timezone})
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-medium text-slate-700">Backend connectivity</h2>
-          <div className="mt-2 flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
-            <span className="text-sm text-slate-600">
-              {status.state === 'loading' ? 'Checking…' : `API ${status.detail}`}
-            </span>
+      {/* The one figure the page leads with: what is owed and not yet collected. */}
+      <section
+        className={`mt-6 rounded-lg border p-6 ${
+          nothingOverdue ? 'border-slate-200 bg-white' : 'border-red-200 bg-red-50'
+        }`}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            {/* Status is never colour alone: the word "overdue" carries it too. */}
+            <p className={`text-sm font-medium ${nothingOverdue ? 'text-slate-500' : 'text-red-700'}`}>
+              {nothingOverdue ? 'Nothing overdue' : 'Overdue premiums'}
+            </p>
+            <p
+              className={`mt-1 text-5xl font-semibold tracking-tight ${
+                nothingOverdue ? 'text-slate-400' : 'text-red-800'
+              }`}
+            >
+              <Amounts amounts={data.overdue.amounts} emptyLabel="All clear" />
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {nothingOverdue
+                ? 'Every premium due so far has been settled.'
+                : `${countLabel(data.overdue, 'instalment')} past the due date.`}
+            </p>
           </div>
-        </section>
+          {!nothingOverdue && (
+            <Link
+              to="/policies"
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Open policies
+            </Link>
+          )}
+        </div>
+      </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-medium text-slate-700">Your account</h2>
-          <dl className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Name</dt>
-              <dd className="text-slate-800">{user?.name}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Role</dt>
-              <dd className="text-slate-800">{user?.role.replace(/_/g, ' ').toLowerCase()}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Organization</dt>
-              <dd className="truncate font-mono text-xs text-slate-600">{user?.organizationId}</dd>
-            </div>
-          </dl>
-        </section>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile label="Due in the next 7 days" footnote={countLabel(data.dueNextSevenDays, 'instalment')}>
+          <Amounts amounts={data.dueNextSevenDays.amounts} />
+        </StatTile>
+        <StatTile label="Collected this month" footnote={countLabel(data.collectedThisMonth, 'payment')}>
+          <Amounts amounts={data.collectedThisMonth.amounts} />
+        </StatTile>
+        <StatTile label="Active customers">{data.activeCustomers}</StatTile>
+        <StatTile label="Active policies">{data.activePolicies}</StatTile>
       </div>
+
+      <section className="mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Action required</h2>
+          {data.pendingReminders > 0 && (
+            <Link to="/reminders" className="text-sm text-blue-600 hover:underline">
+              {data.pendingReminders} reminder{data.pendingReminders === 1 ? '' : 's'} waiting to go out
+            </Link>
+          )}
+        </div>
+
+        {data.actionRequired.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+            Nothing needs chasing right now.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full min-w-[38rem] text-left text-sm">
+              <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Policy</th>
+                  <th className="px-4 py-3 font-medium">Due</th>
+                  <th className="px-4 py-3 font-medium">Overdue by</th>
+                  <th className="px-4 py-3 text-right font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.actionRequired.map((item) => (
+                  <tr key={item.premiumId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <Link to={`/customers/${item.customerId}`} className="font-medium text-slate-900 hover:underline">
+                        {item.customerName}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/policies/${item.policyId}`}
+                        className="font-mono text-xs text-slate-600 hover:underline"
+                      >
+                        {item.policyNumber}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{item.dueDate}</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                        {item.daysOverdue} day{item.daysOverdue === 1 ? '' : 's'}
+                      </span>
+                    </td>
+                    {/* Aligned digits, which is what tabular figures are for. */}
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-800">
+                      {formatMoney(item.amount, item.currencyCode)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

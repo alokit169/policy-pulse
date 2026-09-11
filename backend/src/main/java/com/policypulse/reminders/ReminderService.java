@@ -5,8 +5,7 @@ import com.policypulse.audit.AuditService;
 import com.policypulse.common.ApiException;
 import com.policypulse.common.Domain;
 import com.policypulse.common.PageResponse;
-import com.policypulse.organizations.Organization;
-import com.policypulse.organizations.OrganizationRepository;
+import com.policypulse.organizations.OrganizationZones;
 import com.policypulse.reminders.ReminderDetectionService.DetectionResult;
 import com.policypulse.security.AuthUser;
 import com.policypulse.security.SecurityUtil;
@@ -16,8 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DateTimeException;
-import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
@@ -27,7 +24,7 @@ public class ReminderService {
     private final ReminderRepository reminders;
     private final ReminderConfigurationRepository configurations;
     private final ReminderConfigurations configurationResolver;
-    private final OrganizationRepository organizations;
+    private final OrganizationZones zones;
     private final ReminderDetectionService detection;
     private final ReminderRunner runner;
     private final AuditService audit;
@@ -35,14 +32,14 @@ public class ReminderService {
     public ReminderService(ReminderRepository reminders,
                            ReminderConfigurationRepository configurations,
                            ReminderConfigurations configurationResolver,
-                           OrganizationRepository organizations,
+                           OrganizationZones zones,
                            ReminderDetectionService detection,
                            ReminderRunner runner,
                            AuditService audit) {
         this.reminders = reminders;
         this.configurations = configurations;
         this.configurationResolver = configurationResolver;
-        this.organizations = organizations;
+        this.zones = zones;
         this.detection = detection;
         this.runner = runner;
         this.audit = audit;
@@ -117,13 +114,6 @@ public class ReminderService {
     }
 
     private String timezoneOf(UUID organizationId) {
-        String configured = organizations.findById(organizationId)
-                .map(Organization::getTimezone)
-                .orElse(null);
-        try {
-            return ZoneId.of(configured).getId();
-        } catch (DateTimeException | NullPointerException ex) {
-            return ZoneId.systemDefault().getId();
-        }
+        return zones.zoneOf(organizationId).getId();
     }
 }

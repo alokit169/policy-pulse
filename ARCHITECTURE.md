@@ -36,7 +36,7 @@ flowchart LR
 | `voice` | VoiceProvider, mock/Twilio stub |
 | `conversations` | Calls, transcripts, messages |
 | `followups` | Commitments and HumanTask |
-| `dashboard` | Aggregates and action-required |
+| `dashboard` | Aggregates and action-required, counted in the database |
 | `audit` | Audit log writer |
 | `reports` | CSV/report queries |
 | `scheduler` | Hourly sweep, so each tenant is picked up after its own midnight |

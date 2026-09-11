@@ -5,6 +5,7 @@ import com.policypulse.customers.Customer;
 import com.policypulse.customers.CustomerRepository;
 import com.policypulse.organizations.Organization;
 import com.policypulse.organizations.OrganizationRepository;
+import com.policypulse.organizations.OrganizationZones;
 import com.policypulse.policies.Policy;
 import com.policypulse.policies.PolicyRepository;
 import com.policypulse.premiums.PremiumPayment;
@@ -17,7 +18,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -45,6 +45,7 @@ public class ReminderDetectionService {
 
     private final OrganizationRepository organizations;
     private final ReminderConfigurations configurationResolver;
+    private final OrganizationZones zones;
     private final PremiumPaymentRepository premiums;
     private final PolicyRepository policies;
     private final CustomerRepository customers;
@@ -53,6 +54,7 @@ public class ReminderDetectionService {
 
     public ReminderDetectionService(OrganizationRepository organizations,
                                     ReminderConfigurations configurationResolver,
+                                    OrganizationZones zones,
                                     PremiumPaymentRepository premiums,
                                     PolicyRepository policies,
                                     CustomerRepository customers,
@@ -60,6 +62,7 @@ public class ReminderDetectionService {
                                     Clock clock) {
         this.organizations = organizations;
         this.configurationResolver = configurationResolver;
+        this.zones = zones;
         this.premiums = premiums;
         this.policies = policies;
         this.customers = customers;
@@ -94,7 +97,7 @@ public class ReminderDetectionService {
     public DetectionResult detectForOrganization(UUID organizationId) {
         Organization organization = organizations.findById(organizationId).orElseThrow();
         ReminderConfiguration config = configurationResolver.forOrganization(organizationId);
-        ZoneId zone = zoneOf(organization);
+        ZoneId zone = zones.zoneOf(organization);
 
         // "Today" is the tenant's today. Evaluating an Indian agency's due dates
         // in UTC would shift every reminder by a day for part of each day.
@@ -191,14 +194,4 @@ public class ReminderDetectionService {
         return true;
     }
 
-    /** A bad timezone must not stop a tenant's reminders; fall back to the default. */
-    private ZoneId zoneOf(Organization organization) {
-        try {
-            return ZoneId.of(organization.getTimezone());
-        } catch (DateTimeException | NullPointerException ex) {
-            log.warn("Organization {} has an unusable timezone '{}', using {}",
-                    organization.getId(), organization.getTimezone(), clock.getZone());
-            return clock.getZone();
-        }
-    }
 }
