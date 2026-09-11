@@ -82,6 +82,27 @@ so an entity that drifts from the migrations fails startup rather than silently
 altering tables. Add a new `V<n>__<name>.sql` for every schema change — never
 edit an applied migration.
 
+## Tests
+
+```bash
+cd backend
+mvn test
+```
+
+The suite starts a real PostgreSQL via Testcontainers, applies the Flyway
+migrations and runs Hibernate with `ddl-auto: validate`. An entity that drifts
+from the migrations fails the build, which is the same check a production boot
+performs. Docker must be running.
+
+| Test | Guards |
+| --- | --- |
+| `SchemaIntegrityTest` | Entities match the migrations; every migration applied |
+| `ErrorHandlingTest` | Unmatched routes return 404, protected routes 403, health and API docs public |
+| `RateLimitFilterTest` | Per-client counting and window eviction |
+
+CI runs the same suite plus the frontend build and a smoke test of the full
+Docker stack. See `.github/workflows/ci.yml`.
+
 ## Common commands
 
 ```bash
@@ -113,3 +134,20 @@ published port in `docker-compose.yml`.
 
 **Maven cannot replace the jar on Windows.** A running app holds a lock on
 `target/*.jar`. Stop it before rebuilding.
+
+**Tests fail with "Could not find a valid Docker environment".** Docker is not
+running, or the engine rejects the API version the Docker client library sends.
+Docker Engine 29 refuses anything below API 1.44 and answers `/info` with a bare
+400, which Testcontainers reports as no Docker environment. The build pins the
+version via the `docker.api.version` property in `backend/pom.xml`; on an engine
+older than Docker 25 override it:
+
+```bash
+mvn test -Ddocker.api.version=1.41
+```
+
+Check what your engine accepts with:
+
+```bash
+docker version --format 'API {{.Server.APIVersion}}, min {{.Server.MinAPIVersion}}'
+```

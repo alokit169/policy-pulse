@@ -1,18 +1,43 @@
+# Tests run against a real Postgres supplied by Testcontainers (see
+# TestcontainersConfiguration), so no datasource is declared here.
+#
+# Flyway stays enabled and ddl-auto stays on validate, deliberately: that is
+# what makes entity/schema drift fail the build the same way it fails a
+# production boot. Using H2 with create-drop would hide exactly that class of bug.
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
+    open-in-view: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          time_zone: UTC
   flyway:
-    enabled: false
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
 app:
   seed: false
   jwt:
     secret: test-secret-test-secret-test-secret-32
+    expiration-ms: 86400000
+  cors:
+    allowed-origins: http://localhost:5173
+  # High enough that functional tests never trip it; the limiter has its own test.
+  rate-limit:
+    requests-per-minute: 10000
+  ai:
+    provider: mock
+    api-key: ""
+  voice:
+    provider: mock
+    api-key: ""
+  notification:
+    provider: mock
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

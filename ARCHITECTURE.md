@@ -74,7 +74,9 @@ docs via README, LOCAL_DEVELOPMENT, DATABASE, API, AI_ARCHITECTURE, VOICE, SECUR
 
 ## Dependencies
 
-**Backend:** Spring Boot 3.3 Web, Data JPA, Security, Validation, Actuator, Flyway, PostgreSQL, JJWT, springdoc-openapi, Bucket4j (rate limit).
+**Backend:** Spring Boot 3.3 Web, Data JPA, Security, Validation, Actuator, Flyway, PostgreSQL, JJWT, springdoc-openapi. Rate limiting is a small in-process fixed-window filter, not Bucket4j.
+
+**Testing:** JUnit 5, Spring Boot Test, Testcontainers (real PostgreSQL, Flyway applied, `ddl-auto: validate`).
 
 **Frontend:** React 18, TypeScript, Vite, Tailwind, React Router, Axios, Recharts.
 

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -18,6 +19,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
     private final int limit;
+
+    /**
+     * Per-client counters. Keyed by remote address, which is the real client IP
+     * only because ForwardedHeaderFilter is enabled (server.forward-headers-strategy)
+     * and the proxy sets X-Forwarded-For. Without that every request behind the
+     * proxy shares one bucket.
+     */
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
     public RateLimitFilter(@Value("${app.rate-limit.requests-per-minute}") int limit) {
@@ -43,6 +51,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
         chain.doFilter(request, response);
+    }
+
+    /**
+     * Entries for clients that stop sending requests would otherwise be retained
+     * forever, so sweep windows that are no longer current.
+     */
+    @Scheduled(fixedDelay = 60_000)
+    void evictStaleWindows() {
+        long currentMinute = Instant.now().getEpochSecond() / 60;
+        windows.entrySet().removeIf(entry -> entry.getValue().minute() < currentMinute);
+    }
+
+    int trackedClientCount() {
+        return windows.size();
     }
 
     private record Window(long minute, AtomicInteger count) {}

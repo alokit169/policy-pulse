@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      # Testcontainers starts a real PostgreSQL, so the suite exercises the
+      # Flyway migrations and ddl-auto=validate exactly as production does.
+      # Docker is preinstalled on GitHub-hosted runners.
+      - name: Test
+        working-directory: backend
+        run: mvn -B test
+
+      - name: Package
+        working-directory: backend
+        run: mvn -B -DskipTests package
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+          retention-days: 7
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      # Runs tsc --noEmit and then the production build.
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  compose:
+    name: Docker stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Guards the class of bug that only appears in the container topology,
+      # such as an nginx location missing for a route the SPA calls.
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/actuator/health > /dev/null; then
+              echo "backend healthy"; exit 0
+            fi
+            sleep 5
+          done
+          echo "backend did not become healthy"; docker compose logs --tail=100; exit 1
+
+      - name: Smoke test through the UI origin
+        run: |
+          set -e
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/actuator/health)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/v3/api-docs)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/api/customers)" = "403"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:5173/api/auth/login)" = "404"
+          echo "smoke tests passed"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

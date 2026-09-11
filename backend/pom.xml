@@ -17,6 +17,15 @@
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <!-- Override Spring Boot's managed 1.19.8: its docker-java 3.3.6 cannot
+             negotiate an API version with Docker Engine 29 and fails with a 400
+             on /info. -->
+        <testcontainers.version>1.21.3</testcontainers.version>
+        <!-- docker-java sends a fixed Docker API version. Docker Engine 29
+             rejects anything below 1.44 with a 400 on /info, which surfaces as
+             "Could not find a valid Docker environment". Override with
+             -Ddocker.api.version=<v> for an engine older than Docker 25. -->
+        <docker.api.version>1.44</docker.api.version>
     </properties>
     <dependencies>
         <dependency>
@@ -89,12 +98,36 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <api.version>${docker.api.version}</api.version>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>

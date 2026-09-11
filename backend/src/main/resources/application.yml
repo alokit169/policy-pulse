@@ -20,6 +20,11 @@ spring:
 
 server:
   port: 8080
+  # Behind nginx, honour X-Forwarded-* so request.getRemoteAddr() is the real
+  # client rather than the proxy. The rate limiter keys on it.
+  # The backend must not be reachable directly in production, or these headers
+  # can be spoofed.
+  forward-headers-strategy: framework
 
 management:
   endpoints:
