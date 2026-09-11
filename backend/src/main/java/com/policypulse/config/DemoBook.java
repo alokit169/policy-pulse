@@ -210,8 +210,12 @@ public class DemoBook {
      * behind by.
      */
     private void schedule(Organization org, Policy policy, Person person, LocalDate today) {
+        // The whole term, the way a policy created through the application gets
+        // one. Stopping a couple of months out left a policy that says it runs to
+        // 2035 showing eighteen instalments, which is the demo contradicting
+        // itself in the one place somebody is most likely to look closely.
         List<LocalDate> dates = PremiumSchedule.dueDates(
-                policy.getPolicyStartDate(), today.plusMonths(2), policy.getPremiumFrequency());
+                policy.getPolicyStartDate(), policy.getPolicyEndDate(), policy.getPremiumFrequency());
 
         int lastPast = (int) dates.stream().filter(d -> !d.isAfter(today)).count() - 1;
 

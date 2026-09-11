@@ -201,6 +201,7 @@ performs. Docker must be running.
 | `MockMessageProviderTest` | The mock outcomes are the same every time, and addresses stay out of logs |
 | `MessageContentTest` | A message names the instalment it is about, and nothing typed can reshape it |
 | `LoginLockoutTest` | An account stops answering after enough wrong guesses, and does not say so |
+| `LockoutConcurrencyTest` | Guesses arriving together are all counted, and a lock that runs out gives the attempts back |
 | `PasswordChangeTest` | Changing a password needs the old one and ends every session |
 | `StartupChecksTest` | An unsafe configuration refuses to start unless the machine says it is a development one |
 | `DemoBookTest` | The demo data says what it claims: who is behind, who opted out, what is owed |

@@ -54,9 +54,16 @@ answers, so being locked is not something the response reveals — that would te
 an attacker they had found a real account and were close enough to be worth
 locking out. Signing in successfully clears the count.
 
-> The count is written in its own transaction. Login ends by throwing, so a count
-> written inside that transaction would be rolled back with it and the account
-> would never lock at all. The audit log already had to be built the same way.
+A lock that has run out resets the count, so the owner gets their ten attempts
+back rather than one every fifteen minutes for the rest of the day.
+
+> Two things about the counting, both found by testing it rather than reading it.
+> It happens in its own transaction, because login ends by throwing and a count
+> written inside that transaction is rolled back with it — the audit log already
+> had to be built the same way. And it happens *in the database*: reading the
+> count, adding one and writing it back is not counting, because ten guesses
+> arriving together all read zero and all write one. An attacker does not have to
+> send guesses one at a time, and measured that way ten of them counted as one.
 
 ## Starting up safely
 
@@ -301,6 +308,7 @@ These are understood and deferred, not overlooked.
 | No password reset | A password can be changed by somebody who knows it, but somebody who has forgotten theirs still needs an administrator with database access |
 | Audit log is append-only but unreviewed | A locked account is now the visible signal, but nothing surfaces `LOGIN_FAILURE` patterns before that point |
 | No MFA | Single factor only |
+| Password-change failures are not counted | Somebody holding a stolen token can guess at the current password without tripping the login lockout. Only the per-IP rate limit applies |
 | No real telephony provider | Calls are simulated; a live provider needs webhook signature checks and replay safety before it is wired in |
 | No real email or SMS provider | Messages are simulated. A live one needs the same webhook safety, plus bounce handling and unsubscribe, before it is wired in |
 | Accepted is not delivered | A provider taking a message is recorded as sent; there are no delivery receipts or bounce records yet |

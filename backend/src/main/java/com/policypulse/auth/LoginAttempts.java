@@ -55,21 +55,29 @@ public class LoginAttempts {
         return user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now(clock));
     }
 
-    /** Counts a wrong password, and locks the account once there have been enough. */
+    /**
+     * Counts a wrong password, and locks the account once there have been enough.
+     *
+     * <p>Both steps happen in the database rather than in memory. Counting in
+     * memory is a read, an add and a write, and ten guesses arriving together all
+     * read zero and all write one — the account never reaches the limit and the
+     * whole control does nothing. Locking conditionally does the same job for the
+     * audit record: whichever guess crosses the line writes it, once.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(UUID userId) {
-        AppUser user = users.findById(userId).orElse(null);
-        if (user == null) return;
-
-        int attempts = user.getFailedLoginAttempts() + 1;
-        user.setFailedLoginAttempts(attempts);
-
-        if (attempts >= MAX_FAILED) {
-            user.setLockedUntil(Instant.now(clock).plus(LOCKOUT));
-            audit.record(AuditAction.ACCOUNT_LOCKED, "User", user.getId().toString(),
-                    user.getOrganizationId(), user.getId(), user.getEmail(),
-                    attempts + " consecutive failures");
+        Instant now = Instant.now(clock);
+        if (users.countFailedLogin(userId, now) == 0) {
+            return;
         }
-        users.save(user);
+
+        if (users.lockIfOverLimit(userId, MAX_FAILED, now.plus(LOCKOUT)) == 0) {
+            return;
+        }
+
+        users.findById(userId).ifPresent(user ->
+                audit.record(AuditAction.ACCOUNT_LOCKED, "User", user.getId().toString(),
+                        user.getOrganizationId(), user.getId(), user.getEmail(),
+                        user.getFailedLoginAttempts() + " consecutive failures"));
     }
 }

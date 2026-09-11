@@ -153,6 +153,29 @@ class DemoBookTest extends AbstractIntegrationTest {
         }
     }
 
+    /**
+     * A policy's schedule has to cover the term the policy claims. Stopping short
+     * leaves the demo contradicting itself where somebody is most likely to look
+     * closely, which teaches them the wrong thing about the system.
+     */
+    @Test
+    void everyScheduleCoversTheTermItsPolicyClaims() {
+        for (Customer customer : book()) {
+            Policy policy = policies.findAll().stream()
+                    .filter(p -> p.getCustomerId().equals(customer.getId()))
+                    .findFirst().orElseThrow();
+            List<PremiumPayment> instalments = instalmentsOf(customer);
+
+            assertThat(instalments.get(0).getDueDate())
+                    .as("%s's schedule starts with the policy", customer.getFirstName())
+                    .isEqualTo(policy.getPolicyStartDate());
+            assertThat(instalments.get(instalments.size() - 1).getDueDate())
+                    .as("%s's schedule runs to the end of the term", customer.getFirstName())
+                    .isAfter(policy.getPolicyEndDate().minusMonths(1))
+                    .isBeforeOrEqualTo(policy.getPolicyEndDate());
+        }
+    }
+
     /** The book is not everybody owing on the same day, which no agency looks like. */
     @Test
     void theOverdueDatesAreNotAllTheSame() {
