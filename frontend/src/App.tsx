@@ -1,13 +1,18 @@
 import { NavLink, Outlet, Route, Routes } from 'react-router-dom'
 import RequireAuth from './components/RequireAuth'
 import { useAuth } from './lib/auth'
+import CustomerForm from './pages/CustomerForm'
+import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 
-// Phase 2 shell. Later phases add routes for customers, policies, premiums,
-// reminders and conversations inside the authenticated layout.
-const NAV = [{ to: '/', label: 'Dashboard' }]
+// Later phases add routes for policies, premiums, reminders and conversations
+// inside the authenticated layout.
+const NAV = [
+  { to: '/', label: 'Dashboard' },
+  { to: '/customers', label: 'Customers' },
+]
 
 function AuthenticatedLayout() {
   const { user, logout } = useAuth()
@@ -22,6 +27,9 @@ function AuthenticatedLayout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                // Without end, to="/" matches every path and the dashboard link
+                // would stay highlighted on every page.
+                end={item.to === '/'}
                 className={({ isActive }) =>
                   isActive ? 'font-medium text-slate-900' : 'text-slate-500 hover:text-slate-900'
                 }
@@ -58,6 +66,9 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AuthenticatedLayout />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/new" element={<CustomerForm />} />
+          <Route path="/customers/:id" element={<CustomerForm />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>

@@ -143,6 +143,8 @@ performs. Docker must be running.
 | `SchemaIntegrityTest` | Entities match the migrations; every migration applied |
 | `ErrorHandlingTest` | Unmatched routes return 404, anonymous requests 401, health and API docs public |
 | `AuthIntegrationTest` | Login, token issue, enumeration resistance, live revocation, audit |
+| `CustomerIsolationTest` | Tenant and role isolation: no cross-tenant or cross-agent access |
+| `CustomerCrudTest` | Create, update, archive, restore, search, paging, conflicts |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 
 ### Status codes

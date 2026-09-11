@@ -116,6 +116,29 @@ jobs:
                                         -H "$JSON" \
                                         -d '{"email":"agent@demo.local","password":"Password123!"}'
 
+          # Authenticated routes, exercised with a real token.
+          TOKEN=$(curl -s -X POST http://localhost:5173/api/auth/login \
+                    -H "$JSON" \
+                    -d '{"email":"agent@demo.local","password":"Password123!"}' \
+                  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          if [ -z "$TOKEN" ]; then
+            echo "FAIL  could not obtain a token"; exit 1
+          fi
+          AUTH="Authorization: Bearer $TOKEN"
+
+          check "customer list"     200 -H "$AUTH" http://localhost:5173/api/customers
+          check "customer create"   201 -X POST http://localhost:5173/api/customers \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d '{"firstName":"Smoke","lastName":"Test","phone":"+919000000001"}'
+          check "duplicate phone"   409 -X POST http://localhost:5173/api/customers \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d '{"firstName":"Smoke","lastName":"Again","phone":"+919000000001"}'
+          check "invalid customer"  400 -X POST http://localhost:5173/api/customers \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d '{"firstName":"","lastName":"Test","phone":"+919000000002"}'
+          check "unknown customer"  404 -H "$AUTH" \
+                                        http://localhost:5173/api/customers/00000000-0000-0000-0000-000000000000
+
           exit $failed
 
       - name: Dump logs on failure

@@ -13,16 +13,29 @@ import java.util.UUID;
 public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     Optional<Customer> findByIdAndOrganizationId(UUID id, UUID orgId);
 
+    Optional<Customer> findByOrganizationIdAndPhone(UUID organizationId, String phone);
+
+    boolean existsByOrganizationIdAndCustomerNumberIgnoreCase(UUID organizationId, String customerNumber);
+
+    /**
+     * {@code pattern} is always a LIKE pattern and never null: "%" matches
+     * everything. Passing a nullable term into CONCAT left the parameter
+     * untyped, and Postgres then rejected the query with
+     * "function lower(bytea) does not exist".
+     *
+     * <p>firstName is NOT NULL, so an unfiltered search still matches every row.
+     */
     @Query("""
             SELECT c FROM Customer c WHERE c.organizationId = :org
             AND (:agentId IS NULL OR c.assignedAgentId = :agentId)
             AND (:status IS NULL OR c.status = :status)
-            AND (:q IS NULL OR LOWER(c.firstName) LIKE LOWER(CONCAT('%',:q,'%'))
-                 OR LOWER(c.lastName) LIKE LOWER(CONCAT('%',:q,'%'))
-                 OR c.phone LIKE CONCAT('%',:q,'%')
-                 OR LOWER(c.email) LIKE LOWER(CONCAT('%',:q,'%'))
-                 OR LOWER(c.customerNumber) LIKE LOWER(CONCAT('%',:q,'%')))
+            AND (LOWER(c.firstName) LIKE :pattern
+                 OR LOWER(c.lastName) LIKE :pattern
+                 OR LOWER(c.phone) LIKE :pattern
+                 OR LOWER(c.email) LIKE :pattern
+                 OR LOWER(c.customerNumber) LIKE :pattern)
             """)
     Page<Customer> search(@Param("org") UUID org, @Param("agentId") UUID agentId,
-                          @Param("status") Domain.EntityStatus status, @Param("q") String q, Pageable pageable);
+                          @Param("status") Domain.EntityStatus status,
+                          @Param("pattern") String pattern, Pageable pageable);
 }

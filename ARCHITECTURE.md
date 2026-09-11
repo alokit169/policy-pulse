@@ -27,7 +27,7 @@ flowchart LR
 | `auth` | Login, JWT |
 | `users` | Users and roles |
 | `organizations` | Tenants and reminder config |
-| `customers` | Customer CRM |
+| `customers` | Customer CRM, scoped to the caller's tenant |
 | `policies` | Policies |
 | `premiums` | PremiumPayment records |
 | `reminders` | Reminder entities and detection |

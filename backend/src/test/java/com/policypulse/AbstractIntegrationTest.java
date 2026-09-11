@@ -36,23 +36,31 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected PasswordEncoder passwordEncoder;
     @Autowired protected ObjectMapper objectMapper;
 
-    /**
-     * Creates an organization and a user in it. The email is unique per call so
-     * tests never collide on the global unique email index.
-     */
-    protected AppUser createUser(Domain.Role role, Domain.EntityStatus status) {
+    protected Organization createOrganization() {
         Organization org = new Organization();
-        org.setName("Test Org");
-        organizations.save(org);
+        org.setName("Test Org " + UUID.randomUUID());
+        return organizations.save(org);
+    }
 
+    /**
+     * Creates a user inside an existing organization, for tests that need two
+     * users who are tenant peers.
+     */
+    protected AppUser createUserIn(UUID organizationId, Domain.Role role, Domain.EntityStatus status) {
         AppUser user = new AppUser();
-        user.setOrganizationId(org.getId());
+        user.setOrganizationId(organizationId);
         user.setName("Test User");
+        // Unique per call so tests never collide on the global unique email index.
         user.setEmail("user-" + UUID.randomUUID() + "@test.local");
         user.setRole(role);
         user.setStatus(status);
         user.setPasswordHash(passwordEncoder.encode(TEST_PASSWORD));
         return users.save(user);
+    }
+
+    /** Creates a user in a brand new organization. */
+    protected AppUser createUser(Domain.Role role, Domain.EntityStatus status) {
+        return createUserIn(createOrganization().getId(), role, status);
     }
 
     protected AppUser createActiveAgent() {
