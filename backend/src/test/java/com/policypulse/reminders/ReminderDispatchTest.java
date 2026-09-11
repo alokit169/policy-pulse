@@ -225,7 +225,7 @@ class ReminderDispatchTest extends AbstractIntegrationTest {
             undeliverable.setOrganizationId(agent.getOrganizationId());
             undeliverable.setCustomerId(customer.getId());
             undeliverable.setReminderType(Domain.ReminderType.PREMIUM_DUE);
-            undeliverable.setChannel(Domain.Channel.SMS);
+            undeliverable.setChannel(Domain.Channel.WHATSAPP);
             undeliverable.setStatus(Domain.ReminderStatus.PENDING);
             undeliverable.setScheduledAt(FixedClockConfiguration.FIXED_NOW.minusSeconds(86_400L * (i + 2)));
             undeliverable.setIdempotencyKey("backlog:" + UUID.randomUUID());
@@ -246,7 +246,7 @@ class ReminderDispatchTest extends AbstractIntegrationTest {
         AppUser agent = agentIn(timezone);
         Reminder reminder = givenAReminderFor(agent, timezone, customerFor(agent));
 
-        reminder.setChannel(Domain.Channel.SMS);
+        reminder.setChannel(Domain.Channel.WHATSAPP); // still nothing carries it
         reminders.save(reminder);
 
         assertThat(dispatch.dispatch(reminder.getId())).isEqualTo(Outcome.DEFERRED);

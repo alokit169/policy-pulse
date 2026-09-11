@@ -167,6 +167,37 @@ Phone numbers are masked in logs.
 > fails loudly. Silently placing no calls would be the failure noticed last:
 > reminders would keep being marked as attempted and nobody would ever be rung.
 
+## What may be sent to a customer
+
+Email and SMS go to the **customer**; in-app notifications go to an **agent**.
+Getting that the wrong way round would put an agency's internal wording in front
+of the person it is about, so the two live in separate modules and neither calls
+the other.
+
+**A text keeps to the tenant's calling window; an email does not.** A message
+arriving at three in the morning wakes somebody up, and an email waits to be
+opened. The hour is read in the tenant's own timezone at the moment of sending,
+not when the reminder was queued.
+
+**A provider is told the address and the words, and nothing else.** No customer
+id, no policy id, no reminder id — an outside service needs somewhere to send and
+something to say. Addresses are masked in logs, because a line naming who was
+contacted and about what is a leak in a place nobody checks.
+
+**A customer with no usable address is somebody's job, not a silent failure.**
+Email is optional on a customer, so a tenant that switches to it can have people
+it cannot reach; those raise a task rather than failing quietly for ever. An
+address a provider rejects is not retried, because trying again cannot help.
+
+**Attempts are capped per tenant**, and the count rises whatever the outcome, so
+a provider that fails every time runs out instead of sending for ever — which for
+SMS is also money.
+
+> `app.notification.provider=real` selects providers that are not implemented and
+> refuses to start. Sending nothing while reporting success is the failure that
+> would be noticed last: reminders would keep being marked as sent and no customer
+> would ever hear from anybody.
+
 ## What the follow-up engine may do
 
 It runs from a scheduler with nobody signed in, so it reaches for no security
@@ -208,6 +239,8 @@ These are understood and deferred, not overlooked.
 | Audit log is append-only but unreviewed | Nothing surfaces `LOGIN_FAILURE` patterns yet |
 | No MFA | Single factor only |
 | No real telephony provider | Calls are simulated; a live provider needs webhook signature checks and replay safety before it is wired in |
+| No real email or SMS provider | Messages are simulated. A live one needs the same webhook safety, plus bounce handling and unsubscribe, before it is wired in |
+| Accepted is not delivered | A provider taking a message is recorded as sent; there are no delivery receipts or bounce records yet |
 
 ## Reporting
 

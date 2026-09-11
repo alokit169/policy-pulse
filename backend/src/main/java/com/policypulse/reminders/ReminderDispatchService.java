@@ -3,6 +3,8 @@ package com.policypulse.reminders;
 import com.policypulse.common.Domain;
 import com.policypulse.customers.Customer;
 import com.policypulse.customers.CustomerRepository;
+import com.policypulse.messaging.MessageProviders;
+import com.policypulse.messaging.MessageService;
 import com.policypulse.notifications.NotificationService;
 import com.policypulse.voice.CallService;
 import com.policypulse.policies.Policy;
@@ -39,6 +41,8 @@ public class ReminderDispatchService {
     private final CustomerRepository customers;
     private final NotificationService notifications;
     private final CallService calls;
+    private final MessageService outbound;
+    private final MessageProviders providers;
     private final ReminderConfigurations configurations;
     private final Clock clock;
 
@@ -47,23 +51,33 @@ public class ReminderDispatchService {
             org.springframework.data.domain.PageRequest.of(0, 200);
 
     /**
-     * Channels something can actually deliver today. Email, SMS and WhatsApp
-     * arrive with their providers in a later phase; until then their reminders
-     * are left alone rather than picked up and put down every sweep, which would
-     * crowd out the reminders that can be delivered.
+     * Channels something can actually deliver. In-app and voice are answered
+     * here; the rest is whatever providers exist, so adding one is not also a
+     * matter of remembering to edit a list.
+     *
+     * <p>A channel nothing can carry is left out of the queue entirely. Its
+     * reminders stay pending rather than being picked up and put down every
+     * sweep, which would crowd out the reminders that can be delivered.
      */
-    static final Set<Domain.Channel> DELIVERABLE =
-            EnumSet.of(Domain.Channel.IN_APP, Domain.Channel.VOICE);
+    private Set<Domain.Channel> deliverable() {
+        EnumSet<Domain.Channel> channels =
+                EnumSet.of(Domain.Channel.IN_APP, Domain.Channel.VOICE);
+        channels.addAll(providers.supported());
+        return channels;
+    }
 
     public ReminderDispatchService(ReminderRepository reminders, PolicyRepository policies,
                                    CustomerRepository customers, NotificationService notifications,
-                                   CallService calls, ReminderConfigurations configurations,
+                                   CallService calls, MessageService outbound,
+                                   MessageProviders providers, ReminderConfigurations configurations,
                                    Clock clock) {
         this.reminders = reminders;
         this.policies = policies;
         this.customers = customers;
         this.notifications = notifications;
         this.calls = calls;
+        this.outbound = outbound;
+        this.providers = providers;
         this.configurations = configurations;
         this.clock = clock;
     }
@@ -74,7 +88,7 @@ public class ReminderDispatchService {
      */
     @Transactional(readOnly = true)
     public List<UUID> dueReminderIds() {
-        return reminders.findDue(DELIVERABLE, Instant.now(clock), BATCH).stream()
+        return reminders.findDue(deliverable(), Instant.now(clock), BATCH).stream()
                 .map(Reminder::getId)
                 .toList();
     }
@@ -82,7 +96,7 @@ public class ReminderDispatchService {
     /** Due reminders for one tenant only. */
     @Transactional(readOnly = true)
     public List<UUID> dueReminderIdsFor(UUID organizationId) {
-        return reminders.findDueForOrganization(organizationId, DELIVERABLE, Instant.now(clock), BATCH).stream()
+        return reminders.findDueForOrganization(organizationId, deliverable(), Instant.now(clock), BATCH).stream()
                 .map(Reminder::getId)
                 .toList();
     }
@@ -90,7 +104,7 @@ public class ReminderDispatchService {
     /** How much is queued on a channel nothing can deliver yet. */
     @Transactional(readOnly = true)
     public long undeliverableBacklog() {
-        return reminders.countByStatusAndChannelNotIn(Domain.ReminderStatus.PENDING, DELIVERABLE);
+        return reminders.countByStatusAndChannelNotIn(Domain.ReminderStatus.PENDING, deliverable());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -120,7 +134,11 @@ public class ReminderDispatchService {
             return placeCall(reminder);
         }
 
-        if (!DELIVERABLE.contains(reminder.getChannel())) {
+        if (providers.forChannel(reminder.getChannel()).isPresent()) {
+            return sendMessage(reminder);
+        }
+
+        if (reminder.getChannel() != Domain.Channel.IN_APP) {
             // Email and SMS arrive with their providers in a later phase.
             // Leaving it pending is honest: nothing was sent.
             log.debug("Reminder {} is for {}, which has no provider yet",
@@ -135,6 +153,28 @@ public class ReminderDispatchService {
         reminder.setLastAttemptAt(Instant.now(clock));
         reminders.save(reminder);
         return Outcome.SENT;
+    }
+
+    /**
+     * Hands an email or SMS reminder to the message service, which owns the hours
+     * that channel may be used, the attempt limit and what to do when there is no
+     * usable address.
+     */
+    private Outcome sendMessage(Reminder reminder) {
+        Customer customer = customers.findById(reminder.getCustomerId()).orElse(null);
+        if (customer == null) return defer(reminder);
+
+        Policy policy = reminder.getPolicyId() == null ? null
+                : policies.findById(reminder.getPolicyId()).orElse(null);
+
+        return switch (outbound.send(reminder, customer, policy,
+                configurations.forOrganization(reminder.getOrganizationId()))) {
+            case SENT -> Outcome.SENT;
+            // Put back on purpose. MessageService has already said when to try
+            // again where that applies; this only returns the claim.
+            case RETRY_SCHEDULED, OUTSIDE_WINDOW, NO_PROVIDER -> defer(reminder);
+            case GIVEN_UP -> Outcome.CANCELLED;
+        };
     }
 
     /**

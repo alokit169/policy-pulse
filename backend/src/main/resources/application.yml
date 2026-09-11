@@ -54,6 +54,7 @@ app:
     api-key: ${VOICE_API_KEY:}
   notification:
     provider: ${NOTIFICATION_PROVIDER:mock}
+    api-key: ${NOTIFICATION_API_KEY:}
 
 logging:
   pattern:

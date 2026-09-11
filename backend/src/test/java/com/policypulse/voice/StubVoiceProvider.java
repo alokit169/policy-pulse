@@ -16,6 +16,11 @@ public class StubVoiceProvider implements VoiceProvider {
     // Counted across threads, so a test about two sweeps racing can trust it.
     private final AtomicInteger callsPlaced = new AtomicInteger();
 
+    /** Back to a clean provider that answers every call. */
+    public synchronized void reset() {
+        willReturn(answered());
+    }
+
     public synchronized void willReturn(CallResult... results) {
         queued.clear();
         callsPlaced.set(0);

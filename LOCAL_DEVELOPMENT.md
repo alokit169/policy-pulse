@@ -114,7 +114,7 @@ development, so the app runs without any `.env` present.
 | `APP_SEED` | `false` | Seed demo data on boot |
 | `AI_PROVIDER` | `mock` | AI backend |
 | `VOICE_PROVIDER` | `mock` | Voice backend. Only `mock` is implemented; `twilio` fails at startup on purpose |
-| `NOTIFICATION_PROVIDER` | `mock` | Notification backend |
+| `NOTIFICATION_PROVIDER` | `mock` | Email and SMS backend. Only `mock` is implemented; `real` fails at startup on purpose |
 
 Never commit a real `JWT_SECRET`. `.env` is gitignored.
 
@@ -163,6 +163,8 @@ performs. Docker must be running.
 | `AiSafetyTest` | What the assistant may cause, and above all what it may not |
 | `MockAIProviderTest` | Intent rules, including that only the customer is read |
 | `VoiceCallTest` | The calling window, attempt limits, retries and the transcript a call leaves |
+| `MessagingTest` | Which channel may be used when, unusable addresses, retries, and what is recorded |
+| `MockMessageProviderTest` | The mock outcomes are the same every time, and addresses stay out of logs |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 
@@ -182,6 +184,20 @@ so a SPA can tell the two apart.
 
 CI runs the same suite plus the frontend build and a smoke test of the full
 Docker stack. See `.github/workflows/ci.yml`.
+
+### Watching a message go out
+
+Nothing is actually sent. As a manager, set `preferredChannel` to `EMAIL` or
+`SMS` on the Reminders page, give a customer a policy with a premium due today,
+and run detection. What went out appears in that customer's conversation history
+alongside any calls.
+
+The mocks decide their outcome from the address, so a demo can show each case: an
+address at `invalid.test` bounces, one at `fail.test` errors and is retried, and a
+phone number ending in `2` or `3` does the same. Everything else is accepted.
+
+A text is only sent inside the tenant's calling window — an email ignores it —
+so `"sent":0` on an SMS run usually means the window, not a failure.
 
 ### Watching a promise be kept or broken
 

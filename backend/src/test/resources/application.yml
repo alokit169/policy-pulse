@@ -43,8 +43,10 @@ app:
   voice:
     provider: mock
     api-key: ""
+  # Neither mock loads: the messaging registry collects every provider on the
+  # classpath, so a stub cannot displace one by being primary.
   notification:
-    provider: mock
+    provider: stub
 
 logging:
   level:

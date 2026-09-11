@@ -6,6 +6,9 @@ import com.policypulse.organizations.Organization;
 import com.policypulse.organizations.OrganizationRepository;
 import com.policypulse.users.AppUser;
 import com.policypulse.users.UserRepository;
+import com.policypulse.messaging.StubMessageProvider;
+import com.policypulse.voice.StubVoiceProvider;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,7 +31,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class,
         com.policypulse.ai.StubAiConfiguration.class,
-        com.policypulse.voice.StubVoiceConfiguration.class})
+        com.policypulse.voice.StubVoiceConfiguration.class,
+        com.policypulse.messaging.StubMessagingConfiguration.class})
 public abstract class AbstractIntegrationTest {
 
     protected static final String TEST_PASSWORD = "Password123!";
@@ -37,6 +42,21 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected OrganizationRepository organizations;
     @Autowired protected PasswordEncoder passwordEncoder;
     @Autowired protected ObjectMapper objectMapper;
+    @Autowired private List<StubMessageProvider> messageStubs;
+    @Autowired private StubVoiceProvider voiceStub;
+
+    /**
+     * The stubs are singletons shared by every test in the context, and they
+     * remember both what they were told to return and how often they were used.
+     * Left alone, a test that does not set them up inherits whatever the previous
+     * one wanted, which makes failures depend on the order tests happen to run
+     * in. Cleared before each so a test only sees what it asked for.
+     */
+    @BeforeEach
+    void resetStubProviders() {
+        messageStubs.forEach(StubMessageProvider::reset);
+        voiceStub.reset();
+    }
 
     protected Organization createOrganization() {
         Organization org = new Organization();

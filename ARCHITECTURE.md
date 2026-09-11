@@ -14,10 +14,11 @@ flowchart LR
   Jobs --> API
   API --> AI[AIProvider]
   API --> Voice[VoiceProvider]
-  API --> Notify[NotificationProvider]
+  API --> Msg[MessageProvider]
   AI --> MockAI[MockAIProvider]
   Voice --> MockVoice[MockVoiceProvider]
-  Notify --> MockNotify[MockNotificationProvider]
+  Msg --> MockEmail[MockEmailProvider]
+  Msg --> MockSms[MockSmsProvider]
 ```
 
 ## Modules (backend)
@@ -31,7 +32,8 @@ flowchart LR
 | `policies` | Policies, scoped to the caller's tenant |
 | `premiums` | Instalment schedules and recorded payments |
 | `reminders` | Reminder entities, idempotent detection and per-tenant settings |
-| `notifications` | In-app messages per user + provider abstraction |
+| `notifications` | In-app messages, which go to an agent rather than to a customer |
+| `messaging` | Email and SMS to the customer: which channel may be used when, and what it says |
 | `ai` | AIProvider, intent, context, and the validation that bounds it |
 | `voice` | Placing calls: the calling window, attempt limits, and what a call leaves behind |
 | `conversations` | Calls and transcripts, written either by an agent or by a placed call |
@@ -78,6 +80,12 @@ AI never writes `PremiumPayment.status = PAID`. `PAYMENT_CONFIRMED` creates pend
 A call is not retried for ever: past the tenant's attempt limit, or against a
 number that cannot be dialled, the reminder is given up on and a HumanTask is
 raised, so the work becomes somebody's rather than disappearing.
+
+A reminder goes out on the channel its tenant prefers. Whether the hour matters
+depends on the channel: a text arrives with a noise in the night, so it keeps to
+the tenant's calling window, and an email waits to be opened. Whatever goes out
+is written to the customer's history, so calls, emails and texts answer "what
+have we already said to this person" together rather than three separately.
 
 Nor is a commitment recorded and then forgotten. The engine reads the books before
 anyone is asked to chase a payment, so a promise already kept closes itself; one

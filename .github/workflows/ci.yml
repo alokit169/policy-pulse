@@ -376,6 +376,71 @@ jobs:
             fi
           fi
 
+          # Email and SMS. The rule worth proving is the one that distinguishes
+          # them: a text arriving in the middle of the night wakes somebody up,
+          # so it keeps to the tenant's calling window, and an email does not.
+          # Both are checked against the same shut window, so neither passes for
+          # the wrong reason.
+          message_config() {
+            check "$1" 200 -X PUT http://localhost:5173/api/reminders/configuration \
+                           -H "$ADMIN_AUTH" -H "$JSON" \
+                           -d "{\"daysBeforeDue\":\"0,1\",\"daysAfterDue\":\"1\",\"maxCallAttempts\":3,\"retryDelayMinutes\":60,\"allowedCallingStart\":\"00:00:00\",\"allowedCallingEnd\":\"00:01:00\",\"preferredChannel\":\"$2\"}"
+          }
+
+          new_policy_holder() {
+            local id
+            id=$(curl -s -X POST http://localhost:5173/api/customers \
+                   -H "$AUTH" -H "$JSON" \
+                   -d "{\"firstName\":\"$1\",\"lastName\":\"Reach\",\"phone\":\"${PHONE}$2\",\"email\":\"$3\"}" \
+                 | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+            curl -s -o /dev/null -X POST http://localhost:5173/api/policies \
+              -H "$AUTH" -H "$JSON" \
+              -d "{\"customerId\":\"$id\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"4500.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"$TENANT_TODAY\",\"policyEndDate\":\"$TENANT_TODAY\"}"
+          }
+
+          message_config "prefer SMS, window shut" "SMS"
+          new_policy_holder "Texted" "8" "texted@example.test"
+          TEXTED=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect)
+          if echo "$TEXTED" | grep -q '"created":0'; then
+            echo "FAIL  no SMS reminder was raised to test the hour with: $TEXTED"
+            failed=1
+          elif echo "$TEXTED" | grep -q '"sent":0'; then
+            echo "ok    nobody was texted outside the calling window"
+          else
+            echo "FAIL  a text was sent outside the calling window: $TEXTED"
+            failed=1
+          fi
+
+          message_config "prefer email, same shut window" "EMAIL"
+          new_policy_holder "Emailed" "4" "emailed@example.test"
+          EMAILED=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect)
+          if echo "$EMAILED" | grep -q '"sent":0'; then
+            echo "FAIL  an email waited on hours that only matter to a text: $EMAILED"
+            docker compose logs backend --tail=40
+            failed=1
+          else
+            echo "ok    an email went out regardless of the hour"
+          fi
+
+          # What was sent has to be readable in the customer's history, or nobody
+          # can tell what the agency has already said to them.
+          EMAIL_CONV=$(curl -s -H "$ADMIN_AUTH" 'http://localhost:5173/api/conversations?size=50' \
+                       | sed 's/},{/}\n{/g' \
+                       | grep '"channel":"EMAIL"' \
+                       | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+          if [ -z "$EMAIL_CONV" ]; then
+            echo "FAIL  the email left nothing in the customer's history"
+            failed=1
+          else
+            BODY=$(curl -s -H "$ADMIN_AUTH" "http://localhost:5173/api/conversations/$EMAIL_CONV")
+            if echo "$BODY" | grep -q 'INR 4500.00'; then
+              echo "ok    the email was recorded, in rupees, in the customer's history"
+            else
+              echo "FAIL  the recorded email does not say what was sent: $BODY"
+              failed=1
+            fi
+          fi
+
           # The follow-up engine. What a smoke test can prove here is the wiring:
           # the route, who may use it, that a follow-up whose moment has arrived
           # comes due, and that running again tells nobody twice.
