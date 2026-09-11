@@ -38,6 +38,11 @@ public class TwilioVoiceProvider implements VoiceProvider {
         if (apiKey.isBlank()) {
             log.error("app.voice.api-key is also unset");
         }
+        // Refused here rather than per call. Failing at each call would leave
+        // every voice reminder throwing and rolling back for ever — including
+        // the attempt count, so it would never even run out of attempts.
+        throw new IllegalStateException(
+                "app.voice.provider=twilio is not implemented. Set app.voice.provider=mock.");
     }
 
     @Override

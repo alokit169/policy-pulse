@@ -205,6 +205,41 @@ class ReminderDispatchTest extends AbstractIntegrationTest {
         assertThat(reminders.findById(reminder.getId()).orElseThrow().getAttemptCount()).isEqualTo(1);
     }
 
+    /**
+     * Reminders on a channel with no provider stay pending for ever, so they only
+     * get older, and the due queue is oldest first and capped. Left in it they
+     * would sit at the head of the queue permanently and, once there were enough
+     * of them, starve every other tenant's reminders behind them.
+     */
+    @Test
+    void anUndeliverableBacklogDoesNotStarveAReminderThatCanBeDelivered() {
+        String timezone = "Asia/Kolkata";
+        AppUser agent = agentIn(timezone);
+        Customer customer = customerFor(agent);
+        Reminder deliverable = givenAReminderFor(agent, timezone, customer);
+
+        // More than one sweep can carry, every one of them older than the
+        // reminder that matters.
+        for (int i = 0; i < 250; i++) {
+            Reminder undeliverable = new Reminder();
+            undeliverable.setOrganizationId(agent.getOrganizationId());
+            undeliverable.setCustomerId(customer.getId());
+            undeliverable.setReminderType(Domain.ReminderType.PREMIUM_DUE);
+            undeliverable.setChannel(Domain.Channel.SMS);
+            undeliverable.setStatus(Domain.ReminderStatus.PENDING);
+            undeliverable.setScheduledAt(FixedClockConfiguration.FIXED_NOW.minusSeconds(86_400L * (i + 2)));
+            undeliverable.setIdempotencyKey("backlog:" + UUID.randomUUID());
+            reminders.save(undeliverable);
+        }
+
+        runner.dispatchDue();
+
+        assertThat(reminders.findById(deliverable.getId()).orElseThrow().getStatus())
+                .as("the one reminder that could go out did")
+                .isEqualTo(Domain.ReminderStatus.SENT);
+        assertThat(notificationsFor(agent)).hasSize(1);
+    }
+
     @Test
     void aChannelWithNoProviderIsLeftPendingRatherThanClaimedSent() {
         String timezone = "Asia/Kolkata";

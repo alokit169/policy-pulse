@@ -24,6 +24,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.UUID;
 
 /**
@@ -32,6 +33,12 @@ import java.util.UUID;
  * <p>Runs from the scheduler, so there is no signed-in user: nothing here may
  * reach for a security context, and every record it writes carries the tenant
  * taken from the reminder rather than from a caller.
+ *
+ * <p>The provider is called inside the transaction, which is only tolerable
+ * because the mock returns at once. A real telephony provider must not be wired
+ * in here as a blocking HTTP call: it would hold a database connection open for
+ * the length of a phone call. It answers immediately and reports the outcome on
+ * a webhook instead, which is the work described on TwilioVoiceProvider.
  *
  * <p>Three things are checked before a number is dialled, and a provider is
  * trusted with none of them.
@@ -92,7 +99,13 @@ public class CallService {
         ZoneId zone = zones.zoneOf(reminder.getOrganizationId());
 
         if (!insideCallingWindow(config, zone)) {
-            log.debug("Reminder {} is outside the calling window for {}", reminder.getId(), zone);
+            // Told when to come back, rather than looked at again every sweep.
+            // A reminder that keeps its old moment stays at the head of the due
+            // queue all night, ahead of work that could actually go out.
+            reminder.setNextAttemptAt(nextWindowOpening(config, zone));
+            reminders.save(reminder);
+            log.debug("Reminder {} is outside the calling window for {}, waiting until {}",
+                    reminder.getId(), zone, reminder.getNextAttemptAt());
             return Decision.OUTSIDE_WINDOW;
         }
 
@@ -122,11 +135,19 @@ public class CallService {
                 reminder.getOrganizationId(), null, provider.name(),
                 "%s attempt=%d".formatted(result.outcome(), reminder.getAttemptCount()));
 
-        return switch (result.outcome()) {
-            case ANSWERED -> recordAnsweredCall(reminder, customer, policy, result);
-            case INVALID_NUMBER -> giveUp(reminder, customer, "INVALID_PHONE_NUMBER");
-            default -> scheduleRetry(reminder, customer, config, result);
-        };
+        if (result.outcome() == CallResult.Outcome.ANSWERED) {
+            return recordAnsweredCall(reminder, customer, policy, result);
+        }
+        if (result.outcome() == CallResult.Outcome.INVALID_NUMBER) {
+            return giveUp(reminder, customer, "INVALID_PHONE_NUMBER");
+        }
+        // Asked of the outcome rather than assumed by a default branch. A new
+        // outcome nobody should be rung again over — a number asking to be left
+        // alone, say — would otherwise be retried simply for being new.
+        if (!result.outcome().worthRetrying()) {
+            return giveUp(reminder, customer, result.outcome().name());
+        }
+        return scheduleRetry(reminder, customer, config, result);
     }
 
     /**
@@ -136,6 +157,19 @@ public class CallService {
     private boolean insideCallingWindow(ReminderConfiguration config, ZoneId zone) {
         LocalTime now = Instant.now(clock).atZone(zone).toLocalTime();
         return !now.isBefore(config.getAllowedCallingStart()) && now.isBefore(config.getAllowedCallingEnd());
+    }
+
+    /**
+     * When this tenant's window next opens: later today if the day has not
+     * reached it, otherwise tomorrow morning.
+     */
+    private Instant nextWindowOpening(ReminderConfiguration config, ZoneId zone) {
+        ZonedDateTime now = Instant.now(clock).atZone(zone);
+        ZonedDateTime opening = now.with(config.getAllowedCallingStart());
+        if (!opening.isAfter(now)) {
+            opening = opening.plusDays(1);
+        }
+        return opening.toInstant();
     }
 
     private Decision recordAnsweredCall(Reminder reminder, Customer customer, Policy policy, CallResult result) {

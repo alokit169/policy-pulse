@@ -83,6 +83,11 @@ public class ReminderService {
         config.setPreferredChannel(request.preferredChannel());
         configurations.save(config);
 
+        // The window has moved, so anything told to wait for the old one has to
+        // be reconsidered. Otherwise a manager who widens the window to catch up
+        // on today's calls sees nothing happen until tomorrow.
+        reminders.wakeRemindersWaitingOnTheCallingWindow(caller.getOrganizationId());
+
         audit.record(AuditAction.REMINDER_CONFIG_UPDATED, ENTITY, config.getId().toString(),
                 caller.getOrganizationId(), caller.getId(), caller.getUsername(), null);
 

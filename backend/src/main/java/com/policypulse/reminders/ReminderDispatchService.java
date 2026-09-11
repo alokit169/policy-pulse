@@ -15,8 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -44,6 +46,15 @@ public class ReminderDispatchService {
     private static final org.springframework.data.domain.Pageable BATCH =
             org.springframework.data.domain.PageRequest.of(0, 200);
 
+    /**
+     * Channels something can actually deliver today. Email, SMS and WhatsApp
+     * arrive with their providers in a later phase; until then their reminders
+     * are left alone rather than picked up and put down every sweep, which would
+     * crowd out the reminders that can be delivered.
+     */
+    static final Set<Domain.Channel> DELIVERABLE =
+            EnumSet.of(Domain.Channel.IN_APP, Domain.Channel.VOICE);
+
     public ReminderDispatchService(ReminderRepository reminders, PolicyRepository policies,
                                    CustomerRepository customers, NotificationService notifications,
                                    CallService calls, ReminderConfigurations configurations,
@@ -63,7 +74,7 @@ public class ReminderDispatchService {
      */
     @Transactional(readOnly = true)
     public List<UUID> dueReminderIds() {
-        return reminders.findDue(Instant.now(clock), BATCH).stream()
+        return reminders.findDue(DELIVERABLE, Instant.now(clock), BATCH).stream()
                 .map(Reminder::getId)
                 .toList();
     }
@@ -71,21 +82,31 @@ public class ReminderDispatchService {
     /** Due reminders for one tenant only. */
     @Transactional(readOnly = true)
     public List<UUID> dueReminderIdsFor(UUID organizationId) {
-        return reminders.findDueForOrganization(organizationId, Instant.now(clock), BATCH).stream()
+        return reminders.findDueForOrganization(organizationId, DELIVERABLE, Instant.now(clock), BATCH).stream()
                 .map(Reminder::getId)
                 .toList();
     }
 
+    /** How much is queued on a channel nothing can deliver yet. */
+    @Transactional(readOnly = true)
+    public long undeliverableBacklog() {
+        return reminders.countByStatusAndChannelNotIn(Domain.ReminderStatus.PENDING, DELIVERABLE);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Outcome dispatch(UUID reminderId) {
+        // Claimed in the database rather than checked in memory. Two sweeps can
+        // race for the same reminder — the hourly one and a manager running
+        // detection by hand — and a read-then-write status check lets both
+        // through, which on a voice reminder means ringing the customer twice.
+        if (reminders.claimForDelivery(reminderId) == 0) {
+            return Outcome.DEFERRED;
+        }
+
         Optional<Reminder> found = reminders.findById(reminderId);
         if (found.isEmpty()) return Outcome.DEFERRED;
 
         Reminder reminder = found.get();
-        if (reminder.getStatus() != Domain.ReminderStatus.PENDING) {
-            // Something else handled it between listing and now.
-            return Outcome.DEFERRED;
-        }
 
         // Consent is checked again here, not only at detection. A customer who
         // opts out after a reminder is raised must not still be contacted.
@@ -99,12 +120,12 @@ public class ReminderDispatchService {
             return placeCall(reminder);
         }
 
-        if (reminder.getChannel() != Domain.Channel.IN_APP) {
+        if (!DELIVERABLE.contains(reminder.getChannel())) {
             // Email and SMS arrive with their providers in a later phase.
             // Leaving it pending is honest: nothing was sent.
             log.debug("Reminder {} is for {}, which has no provider yet",
                     reminder.getId(), reminder.getChannel());
-            return Outcome.DEFERRED;
+            return defer(reminder);
         }
 
         deliverInApp(reminder);
@@ -122,7 +143,7 @@ public class ReminderDispatchService {
      */
     private Outcome placeCall(Reminder reminder) {
         Customer customer = customers.findById(reminder.getCustomerId()).orElse(null);
-        if (customer == null) return Outcome.DEFERRED;
+        if (customer == null) return defer(reminder);
 
         Policy policy = reminder.getPolicyId() == null ? null
                 : policies.findById(reminder.getPolicyId()).orElse(null);
@@ -130,11 +151,22 @@ public class ReminderDispatchService {
         return switch (calls.placeCall(reminder, customer, policy,
                 configurations.forOrganization(reminder.getOrganizationId()))) {
             case ANSWERED -> Outcome.SENT;
-            // Left pending on purpose: another attempt is already scheduled, or
-            // the window has not opened yet and nothing was dialled.
-            case RETRY_SCHEDULED, OUTSIDE_WINDOW -> Outcome.DEFERRED;
+            // Put back on purpose: another attempt is already scheduled, or the
+            // window has not opened yet and nothing was dialled. CallService has
+            // set the moment to try again; this only returns the claim.
+            case RETRY_SCHEDULED, OUTSIDE_WINDOW -> defer(reminder);
             case GIVEN_UP -> Outcome.CANCELLED;
         };
+    }
+
+    /**
+     * Hands a claimed reminder back, so a later sweep can pick it up again.
+     * Whatever decided to defer it has already said when that should be.
+     */
+    private Outcome defer(Reminder reminder) {
+        reminder.setStatus(Domain.ReminderStatus.PENDING);
+        reminders.save(reminder);
+        return Outcome.DEFERRED;
     }
 
     private boolean mayStillContact(Reminder reminder) {

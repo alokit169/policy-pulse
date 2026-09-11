@@ -151,6 +151,7 @@ performs. Docker must be running.
 | `PremiumConcurrencyTest` | Simultaneous payments settle an instalment exactly once |
 | `ReminderDetectionTest` | Detection is repeatable, honours consent and reads each tenant's own date |
 | `ReminderDispatchTest` | Reminders are delivered at the scheduled moment, and only once |
+| `ReminderDispatchConcurrencyTest` | Two sweeps racing for one reminder place one call, not two |
 | `ReminderOffsetsTest` | Parsing the configured day offsets |
 | `ReminderApiTest` | Settings permissions, validation, notification ownership |
 | `FixedClockTest` | The suite really is running against a frozen clock |

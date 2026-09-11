@@ -3,6 +3,7 @@ package com.policypulse.voice;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Stands in for telephony so a test can decide how each call goes.
@@ -12,16 +13,17 @@ import java.util.List;
  */
 public class StubVoiceProvider implements VoiceProvider {
     private final Deque<CallResult> queued = new ArrayDeque<>();
-    private int callsPlaced;
+    // Counted across threads, so a test about two sweeps racing can trust it.
+    private final AtomicInteger callsPlaced = new AtomicInteger();
 
-    public void willReturn(CallResult... results) {
+    public synchronized void willReturn(CallResult... results) {
         queued.clear();
-        callsPlaced = 0;
+        callsPlaced.set(0);
         queued.addAll(List.of(results));
     }
 
     public int callsPlaced() {
-        return callsPlaced;
+        return callsPlaced.get();
     }
 
     public static CallResult answered() {
@@ -40,8 +42,8 @@ public class StubVoiceProvider implements VoiceProvider {
     }
 
     @Override
-    public CallResult call(CallRequest request) {
-        callsPlaced++;
+    public synchronized CallResult call(CallRequest request) {
+        callsPlaced.incrementAndGet();
         // Repeats the last queued outcome rather than running out, so a test that
         // only cares about the attempt limit need not queue one per attempt.
         return queued.size() > 1 ? queued.poll() : queued.peek();

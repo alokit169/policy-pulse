@@ -152,6 +152,12 @@ somebody's instead of disappearing.
 **A number that cannot be dialled is not retried**, because trying again cannot
 help. It goes straight to a person.
 
+**A reminder is claimed before it is dialled**, with a conditional update that
+only one caller can win. The hourly sweep and a manager running detection by hand
+can want the same reminder at the same moment; checking its status in memory and
+then writing it lets both through, and by the time the second one notices, the
+customer has been rung twice.
+
 Consent is checked earlier still, at detection: an opted-out customer leaves no
 queued reminder at all, so there is nothing for a later run to act on by mistake.
 

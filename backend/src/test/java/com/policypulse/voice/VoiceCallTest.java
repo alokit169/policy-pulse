@@ -21,6 +21,8 @@ import com.policypulse.users.AppUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -31,6 +33,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Placing calls, and the rules that decide whether one may be placed at all.
@@ -140,6 +144,58 @@ class VoiceCallTest extends AbstractIntegrationTest {
         Reminder after = reloaded(scene);
         assertThat(after.getStatus()).isEqualTo(Domain.ReminderStatus.PENDING);
         assertThat(after.getAttemptCount()).as("a call that never happened is not an attempt").isZero();
+    }
+
+    /**
+     * A reminder parked for a shut window was told when to come back based on
+     * the window as it then was. Widening the window has to reconsider it, or a
+     * manager opening the afternoon to catch up on today's calls sees nothing
+     * happen until tomorrow.
+     */
+    @Test
+    void wideningTheWindowWakesTheRemindersItHadShutOut() throws Exception {
+        Scene scene = given("UTC", 3, 180); // 06:00 UTC, window opens at 09:00
+        voice.willReturn(StubVoiceProvider.answered());
+
+        assertThat(dispatch.dispatch(scene.reminder().getId()))
+                .isEqualTo(ReminderDispatchService.Outcome.DEFERRED);
+        assertThat(reloaded(scene).getNextAttemptAt()).isNotNull();
+
+        AppUser manager = createUserIn(scene.org().getId(),
+                Domain.Role.ORGANIZATION_ADMIN, Domain.EntityStatus.ACTIVE);
+        mvc.perform(put("/api/reminders/configuration")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(manager))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"daysBeforeDue\":\"0\",\"daysAfterDue\":\"2\","
+                                + "\"maxCallAttempts\":3,\"retryDelayMinutes\":180,"
+                                + "\"allowedCallingStart\":\"00:00:00\",\"allowedCallingEnd\":\"23:59:00\","
+                                + "\"preferredChannel\":\"VOICE\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(reloaded(scene).getNextAttemptAt())
+                .as("no longer waiting for a window that has moved")
+                .isNull();
+
+        assertThat(dispatch.dispatch(scene.reminder().getId()))
+                .isEqualTo(ReminderDispatchService.Outcome.SENT);
+        assertThat(voice.callsPlaced()).isEqualTo(1);
+    }
+
+    /**
+     * Being told to wait is not the same as being looked at again every hour. A
+     * reminder that keeps its original moment stays at the head of the due queue
+     * all night, ahead of work that could actually go out.
+     */
+    @Test
+    void aReminderOutsideTheWindowWaitsUntilTheWindowOpens() {
+        Scene scene = given("UTC", 3, 180); // 06:00 UTC, window opens at 09:00
+        voice.willReturn(StubVoiceProvider.answered());
+
+        dispatch.dispatch(scene.reminder().getId());
+
+        assertThat(reloaded(scene).getNextAttemptAt())
+                .as("three hours from the frozen 06:00, when the window opens")
+                .isEqualTo(FixedClockConfiguration.FIXED_NOW.plusSeconds(3 * 3600));
     }
 
     @Test

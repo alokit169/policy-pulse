@@ -48,7 +48,21 @@ public class ReminderRunner {
         if (sent > 0) {
             log.info("Delivered {} reminders", sent);
         }
+
+        warnAboutWorkNothingCanDeliver();
         return total;
+    }
+
+    /**
+     * Reminders on a channel with no provider are left out of the due queue so
+     * they cannot starve the ones that can go out. Said out loud once a sweep,
+     * because a queue nothing is working through should not also be silent.
+     */
+    private void warnAboutWorkNothingCanDeliver() {
+        long waiting = dispatch.undeliverableBacklog();
+        if (waiting > 0) {
+            log.warn("{} reminders are waiting on a channel with no provider yet", waiting);
+        }
     }
 
     /**
