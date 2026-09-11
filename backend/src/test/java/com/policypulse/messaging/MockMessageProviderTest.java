@@ -66,6 +66,19 @@ class MockMessageProviderTest {
     }
 
     @Test
+    void aValueGoingIntoAMessageIsReducedToOneLine() {
+        assertThat(Sanitised.oneLine("POL-2\r\nBcc: everyone@example.test"))
+                .isEqualTo("POL-2 Bcc: everyone@example.test");
+        assertThat(Sanitised.oneLine("  spaced   out  ")).isEqualTo("spaced out");
+        assertThat(Sanitised.oneLine("tab\tseparated")).isEqualTo("tab separated");
+        assertThat(Sanitised.oneLine("null\u0000byte")).isEqualTo("nullbyte");
+        assertThat(Sanitised.oneLine("   ")).isEmpty();
+        assertThat(Sanitised.oneLine(null))
+                .as("a missing value stays missing rather than becoming empty")
+                .isNull();
+    }
+
+    @Test
     void aReferenceComesBackSoASendCanBeTracedToTheProvider() {
         assertThat(email.send(new OutboundMessage(Domain.Channel.EMAIL, "a@b.test", "s", "b", 1))
                 .providerReference()).startsWith("mock-email-");

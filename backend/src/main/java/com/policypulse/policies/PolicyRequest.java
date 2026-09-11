@@ -25,6 +25,15 @@ public record PolicyRequest(
         UUID customerId,
 
         @Size(max = 64, message = "Policy number must be at most 64 characters")
+        /*
+         * Bounded in shape as well as length. A policy number is whatever the
+         * agency types and it ends up in an email subject, where a line break
+         * would end the header and let the rest become headers of its own. The
+         * message layer strips control characters too; this stops them being
+         * stored at all.
+         */
+        @Pattern(regexp = "^[A-Za-z0-9 ._/-]*$",
+                message = "Policy number may contain only letters, digits, spaces and . _ / -")
         String policyNumber,
 
         @NotBlank(message = "Insurance provider is required")

@@ -10,6 +10,8 @@ import com.policypulse.conversations.ConversationRepository;
 import com.policypulse.customers.Customer;
 import com.policypulse.organizations.OrganizationZones;
 import com.policypulse.policies.Policy;
+import com.policypulse.premiums.PremiumPayment;
+import com.policypulse.premiums.PremiumPaymentRepository;
 import com.policypulse.reminders.Reminder;
 import com.policypulse.reminders.ReminderConfiguration;
 import com.policypulse.reminders.ReminderRepository;
@@ -75,6 +77,7 @@ public class MessageService {
     }
 
     private final MessageProviders providers;
+    private final PremiumPaymentRepository premiums;
     private final ConversationRepository conversations;
     private final ConversationMessageRepository messages;
     private final ReminderRepository reminders;
@@ -83,11 +86,13 @@ public class MessageService {
     private final AuditService audit;
     private final Clock clock;
 
-    public MessageService(MessageProviders providers, ConversationRepository conversations,
+    public MessageService(MessageProviders providers, PremiumPaymentRepository premiums,
+                          ConversationRepository conversations,
                           ConversationMessageRepository messages, ReminderRepository reminders,
                           HumanTaskRepository humanTasks, OrganizationZones zones,
                           AuditService audit, Clock clock) {
         this.providers = providers;
+        this.premiums = premiums;
         this.conversations = conversations;
         this.messages = messages;
         this.reminders = reminders;
@@ -125,8 +130,10 @@ public class MessageService {
             return giveUp(reminder, customer, provider, missingAddressReason(reminder.getChannel()));
         }
 
-        String subject = ReminderMessages.subject(reminder, policy);
-        String body = ReminderMessages.body(reminder, customer, policy);
+        // Sanitised again here, not only where the message is written, so a
+        // template added later cannot hand a provider a second line by accident.
+        String subject = Sanitised.oneLine(ReminderMessages.subject(reminder, policy));
+        String body = ReminderMessages.body(reminder, customer, policy, instalmentFor(reminder));
 
         SendResult result = provider.send(new OutboundMessage(
                 reminder.getChannel(), address, subject, body, reminder.getAttemptCount() + 1));
@@ -150,6 +157,16 @@ public class MessageService {
             return giveUp(reminder, customer, provider, result.outcome().name());
         }
         return scheduleRetry(reminder, customer, provider, config, result);
+    }
+
+    /**
+     * The instalment the reminder names, so the message states the figures the
+     * customer is actually being chased for rather than whatever the policy holds
+     * as next. Null on reminders raised before that was recorded.
+     */
+    private PremiumPayment instalmentFor(Reminder reminder) {
+        return reminder.getPremiumPaymentId() == null ? null
+                : premiums.findById(reminder.getPremiumPaymentId()).orElse(null);
     }
 
     /**

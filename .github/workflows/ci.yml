@@ -354,10 +354,12 @@ jobs:
             echo "ok    the reminder was placed as a call once the window opened"
           fi
 
-          # Only a call writes a conversation against a reminder, so this cannot
-          # be satisfied by the conversations logged by hand further up.
+          # A voice conversation raised by a reminder: the channel rules out the
+          # emails and texts sent further up, and the reminder rules out the
+          # conversations logged by hand.
           CALL=$(curl -s -H "$ADMIN_AUTH" 'http://localhost:5173/api/conversations?size=50' \
                  | sed 's/},{/}\n{/g' \
+                 | grep '"channel":"VOICE"' \
                  | grep '"reminderId":"[0-9a-f]' \
                  | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
           if [ -z "$CALL" ]; then
@@ -375,6 +377,13 @@ jobs:
               failed=1
             fi
           fi
+
+          # A policy number ends up in an email subject, and a subject is a
+          # header that ends at the first line break. One carrying CRLF must not
+          # be storable at all.
+          check "policy number with a line break" 400 -X POST http://localhost:5173/api/policies \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"$CUSTOMER\",\"insuranceProvider\":\"X\",\"policyType\":\"TERM\",\"policyNumber\":\"POL-X\r\nBcc: someone@example.test\",\"premiumAmount\":\"100.00\",\"premiumFrequency\":\"YEARLY\"}"
 
           # Email and SMS. The rule worth proving is the one that distinguishes
           # them: a text arriving in the middle of the night wakes somebody up,

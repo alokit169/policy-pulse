@@ -1,0 +1,11 @@
+-- Which instalment a reminder is about.
+--
+-- A policy's next_premium_due_date is the earliest thing still owing, which is
+-- not the same question. A customer with something unpaid from March has a next
+-- date of March, so a reminder raised about September's instalment was telling
+-- them the wrong date about their own money once messages started saying it out
+-- loud.
+--
+-- Nullable, and read with a fallback to the policy: reminders raised before this
+-- have no answer and are better off with the old approximation than with silence.
+ALTER TABLE reminders ADD COLUMN premium_payment_id UUID REFERENCES premium_payments(id);

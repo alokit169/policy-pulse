@@ -13,6 +13,8 @@ public class Reminder {
     private UUID organizationId;
     private UUID customerId;
     private UUID policyId;
+    /** The instalment this is about. Null on reminders raised before it was recorded. */
+    private UUID premiumPaymentId;
     @Enumerated(EnumType.STRING)
     private Domain.ReminderType reminderType;
     private Instant scheduledAt;
@@ -47,6 +49,8 @@ public class Reminder {
     public void setCustomerId(UUID customerId) { this.customerId = customerId; }
     public UUID getPolicyId() { return policyId; }
     public void setPolicyId(UUID policyId) { this.policyId = policyId; }
+    public UUID getPremiumPaymentId() { return premiumPaymentId; }
+    public void setPremiumPaymentId(UUID premiumPaymentId) { this.premiumPaymentId = premiumPaymentId; }
     public Domain.ReminderType getReminderType() { return reminderType; }
     public void setReminderType(Domain.ReminderType reminderType) { this.reminderType = reminderType; }
     public Instant getScheduledAt() { return scheduledAt; }

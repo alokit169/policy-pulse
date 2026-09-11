@@ -193,6 +193,21 @@ address a provider rejects is not retried, because trying again cannot help.
 a provider that fails every time runs out instead of sending for ever — which for
 SMS is also money.
 
+**Nothing an agency typed can change the shape of a message.** A policy number is
+free text and it goes into an email subject; a subject is a header, and a header
+ends at the first line break, so one containing `
+` would let the rest of the
+value become headers of its own — a `Bcc` nobody asked for, sent from the agency's
+own domain. Policy numbers are now restricted to letters, digits, spaces and
+`. _ / -` on the way in, and every value interpolated into a message is reduced to
+one line on the way out, so a template added later is covered without anybody
+remembering to.
+
+**A message names the instalment its reminder is about.** A policy's next premium
+date is the earliest thing still owing, which is a different question: a customer
+with something unpaid from March would otherwise be told the March date in a
+message about September. Wrong, in writing, about somebody's money.
+
 > `app.notification.provider=real` selects providers that are not implemented and
 > refuses to start. Sending nothing while reporting success is the failure that
 > would be noticed last: reminders would keep being marked as sent and no customer

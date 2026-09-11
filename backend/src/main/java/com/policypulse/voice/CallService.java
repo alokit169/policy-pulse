@@ -10,6 +10,8 @@ import com.policypulse.conversations.ConversationRepository;
 import com.policypulse.customers.Customer;
 import com.policypulse.organizations.OrganizationZones;
 import com.policypulse.policies.Policy;
+import com.policypulse.premiums.PremiumPayment;
+import com.policypulse.premiums.PremiumPaymentRepository;
 import com.policypulse.reminders.Reminder;
 import com.policypulse.reminders.ReminderConfiguration;
 import com.policypulse.reminders.ReminderRepository;
@@ -71,6 +73,7 @@ public class CallService {
     }
 
     private final VoiceProvider provider;
+    private final PremiumPaymentRepository premiums;
     private final ConversationRepository conversations;
     private final ConversationMessageRepository messages;
     private final ReminderRepository reminders;
@@ -79,11 +82,13 @@ public class CallService {
     private final AuditService audit;
     private final Clock clock;
 
-    public CallService(VoiceProvider provider, ConversationRepository conversations,
+    public CallService(VoiceProvider provider, PremiumPaymentRepository premiums,
+                       ConversationRepository conversations,
                        ConversationMessageRepository messages, ReminderRepository reminders,
                        HumanTaskRepository humanTasks, OrganizationZones zones,
                        AuditService audit, Clock clock) {
         this.provider = provider;
+        this.premiums = premiums;
         this.conversations = conversations;
         this.messages = messages;
         this.reminders = reminders;
@@ -119,11 +124,17 @@ public class CallService {
             return giveUp(reminder, customer, "NO_PHONE_NUMBER");
         }
 
+        // The instalment the reminder names, not whatever the policy holds as
+        // next: a customer with something still owing from March would otherwise
+        // be read the March date on a call about September.
+        PremiumPayment instalment = reminder.getPremiumPaymentId() == null ? null
+                : premiums.findById(reminder.getPremiumPaymentId()).orElse(null);
+
         CallResult result = provider.call(new CallRequest(
                 customer.getPhone(),
                 customer.getFirstName(),
-                policy == null ? null : policy.getNextPremiumDueDate(),
-                policy == null ? null : policy.getPremiumAmount(),
+                dueDateFor(instalment, policy),
+                amountFor(instalment, policy),
                 reminder.getAttemptCount() + 1));
 
         // Counted whatever happened, so a provider that always fails still runs
@@ -148,6 +159,16 @@ public class CallService {
             return giveUp(reminder, customer, result.outcome().name());
         }
         return scheduleRetry(reminder, customer, config, result);
+    }
+
+    private java.time.LocalDate dueDateFor(PremiumPayment instalment, Policy policy) {
+        if (instalment != null && instalment.getDueDate() != null) return instalment.getDueDate();
+        return policy == null ? null : policy.getNextPremiumDueDate();
+    }
+
+    private java.math.BigDecimal amountFor(PremiumPayment instalment, Policy policy) {
+        if (instalment != null && instalment.getAmount() != null) return instalment.getAmount();
+        return policy == null ? null : policy.getPremiumAmount();
     }
 
     /**

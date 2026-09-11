@@ -167,6 +167,9 @@ public class ReminderDetectionService {
         reminder.setOrganizationId(policy.getOrganizationId());
         reminder.setCustomerId(customer.getId());
         reminder.setPolicyId(policy.getId());
+        // Recorded now, while it is known. Working it back out later means
+        // asking the policy what is next, which is a different question.
+        reminder.setPremiumPaymentId(instalment.getId());
         reminder.setReminderType(type);
         reminder.setChannel(config.getPreferredChannel());
         reminder.setStatus(Domain.ReminderStatus.PENDING);

@@ -165,6 +165,7 @@ performs. Docker must be running.
 | `VoiceCallTest` | The calling window, attempt limits, retries and the transcript a call leaves |
 | `MessagingTest` | Which channel may be used when, unusable addresses, retries, and what is recorded |
 | `MockMessageProviderTest` | The mock outcomes are the same every time, and addresses stay out of logs |
+| `MessageContentTest` | A message names the instalment it is about, and nothing typed can reshape it |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 
