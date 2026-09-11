@@ -69,7 +69,8 @@ export async function updateReminderConfiguration(
   return res.data
 }
 
-export async function detectRemindersNow(): Promise<{ created: number; skipped: number }> {
-  const res = await api.post<{ created: number; skipped: number }>('/reminders/detect')
+/** Raises anything newly due, then delivers whatever is now inside the calling window. */
+export async function detectRemindersNow(): Promise<{ created: number; skipped: number; sent: number }> {
+  const res = await api.post<{ created: number; skipped: number; sent: number }>('/reminders/detect')
   return res.data
 }

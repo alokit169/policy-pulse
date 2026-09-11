@@ -50,9 +50,9 @@ public class ReminderController {
     }
 
     @PostMapping("/detect")
-    @Operation(summary = "Run detection now for the caller's organization")
+    @Operation(summary = "Raise and deliver the caller's organization's due reminders now")
     public Map<String, Integer> detectNow() {
-        ReminderDetectionService.DetectionResult result = reminderService.detectNow();
-        return Map.of("created", result.created(), "skipped", result.skipped());
+        ReminderService.DetectionRun run = reminderService.detectNow();
+        return Map.of("created", run.created(), "skipped", run.skipped(), "sent", run.sent());
     }
 }

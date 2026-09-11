@@ -99,11 +99,15 @@ export default function Reminders() {
     setSaving(true)
     try {
       const result = await detectRemindersNow()
-      setNotice(
+      const raised =
         result.created === 0
-          ? 'Nothing new to raise. Detection is safe to run again at any time.'
-          : `Raised ${result.created} reminder${result.created === 1 ? '' : 's'}.`,
-      )
+          ? 'Nothing new to raise'
+          : `Raised ${result.created} reminder${result.created === 1 ? '' : 's'}`
+      const delivered =
+        result.sent === 0
+          ? 'nothing was due to go out yet'
+          : `delivered ${result.sent}`
+      setNotice(`${raised}, ${delivered}. Running this again is always safe.`)
       setReloadToken((t) => t + 1)
     } catch (err) {
       setError(errorMessage(err, 'Could not run detection'))

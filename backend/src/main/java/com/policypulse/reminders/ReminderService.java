@@ -26,19 +26,25 @@ public class ReminderService {
 
     private final ReminderRepository reminders;
     private final ReminderConfigurationRepository configurations;
+    private final ReminderConfigurations configurationResolver;
     private final OrganizationRepository organizations;
     private final ReminderDetectionService detection;
+    private final ReminderRunner runner;
     private final AuditService audit;
 
     public ReminderService(ReminderRepository reminders,
                            ReminderConfigurationRepository configurations,
+                           ReminderConfigurations configurationResolver,
                            OrganizationRepository organizations,
                            ReminderDetectionService detection,
+                           ReminderRunner runner,
                            AuditService audit) {
         this.reminders = reminders;
         this.configurations = configurations;
+        this.configurationResolver = configurationResolver;
         this.organizations = organizations;
         this.detection = detection;
+        this.runner = runner;
         this.audit = audit;
     }
 
@@ -58,7 +64,7 @@ public class ReminderService {
     @Transactional
     public ReminderConfigurationResponse getConfiguration() {
         UUID orgId = SecurityUtil.current().getOrganizationId();
-        return ReminderConfigurationResponse.of(configurationFor(orgId), timezoneOf(orgId));
+        return ReminderConfigurationResponse.of(configurationResolver.forOrganization(orgId), timezoneOf(orgId));
     }
 
     @Transactional
@@ -70,7 +76,7 @@ public class ReminderService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "The calling window must end after it starts");
         }
 
-        ReminderConfiguration config = configurationFor(caller.getOrganizationId());
+        ReminderConfiguration config = configurationResolver.forOrganization(caller.getOrganizationId());
         config.setDaysBeforeDue(request.daysBeforeDue());
         config.setDaysAfterDue(request.daysAfterDue());
         config.setMaxCallAttempts(request.maxCallAttempts());
@@ -91,25 +97,23 @@ public class ReminderService {
      * tenant on its own; this exists so a manager can see the effect of a
      * configuration change without waiting for the next sweep.
      */
-    public DetectionResult detectNow() {
+    public DetectionRun detectNow() {
         AuthUser caller = SecurityUtil.current();
         requireManager(caller);
-        return detection.detectForOrganization(caller.getOrganizationId());
+
+        DetectionResult detected = detection.detectForOrganization(caller.getOrganizationId());
+        int sent = runner.dispatchDueFor(caller.getOrganizationId());
+        return new DetectionRun(detected.created(), detected.skipped(), sent);
+    }
+
+    /** What one on-demand run did: what it raised, and what it then delivered. */
+    public record DetectionRun(int created, int skipped, int sent) {
     }
 
     private void requireManager(AuthUser caller) {
         if (caller.role() == Domain.Role.AGENT) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Only managers can change reminder settings");
         }
-    }
-
-    /** Tenants without their own configuration get one on first use. */
-    private ReminderConfiguration configurationFor(UUID organizationId) {
-        return configurations.findByOrganizationId(organizationId).orElseGet(() -> {
-            ReminderConfiguration created = new ReminderConfiguration();
-            created.setOrganizationId(organizationId);
-            return configurations.save(created);
-        });
     }
 
     private String timezoneOf(UUID organizationId) {

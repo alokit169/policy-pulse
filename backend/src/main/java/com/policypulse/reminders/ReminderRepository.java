@@ -14,6 +14,14 @@ public interface ReminderRepository extends JpaRepository<Reminder, UUID> {
     Page<Reminder> findByOrganizationId(UUID orgId, Pageable pageable);
     Page<Reminder> findByOrganizationIdAndStatus(UUID orgId, Domain.ReminderStatus status, Pageable pageable);
     List<Reminder> findByStatusAndScheduledAtBefore(Domain.ReminderStatus status, Instant when);
+
+    /** Bounded, so one sweep cannot try to load every overdue reminder at once. */
+    List<Reminder> findTop200ByStatusAndScheduledAtBeforeOrderByScheduledAtAsc(
+            Domain.ReminderStatus status, Instant when);
+
+    /** The same, for one tenant, used by the on-demand run. */
+    List<Reminder> findTop200ByOrganizationIdAndStatusAndScheduledAtBeforeOrderByScheduledAtAsc(
+            UUID organizationId, Domain.ReminderStatus status, Instant when);
     List<Reminder> findByStatusAndNextAttemptAtBefore(Domain.ReminderStatus status, Instant when);
     List<Reminder> findByCustomerIdOrderByScheduledAtDesc(UUID customerId);
     Optional<Reminder> findByIdAndOrganizationId(UUID id, UUID orgId);

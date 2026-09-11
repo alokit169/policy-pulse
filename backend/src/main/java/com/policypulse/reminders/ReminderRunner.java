@@ -20,9 +20,11 @@ public class ReminderRunner {
     private static final Logger log = LoggerFactory.getLogger(ReminderRunner.class);
 
     private final ReminderDetectionService detection;
+    private final ReminderDispatchService dispatch;
 
-    public ReminderRunner(ReminderDetectionService detection) {
+    public ReminderRunner(ReminderDetectionService detection, ReminderDispatchService dispatch) {
         this.detection = detection;
+        this.dispatch = dispatch;
     }
 
     public DetectionResult runAll() {
@@ -41,6 +43,41 @@ public class ReminderRunner {
             log.info("Reminder detection created {} reminders ({} already present)",
                     total.created(), total.skipped());
         }
+
+        int sent = dispatchDue();
+        if (sent > 0) {
+            log.info("Delivered {} reminders", sent);
+        }
         return total;
+    }
+
+    /**
+     * Delivers everything now due, across tenants. Each reminder is dispatched
+     * on its own so one failure does not hold up the rest.
+     */
+    public int dispatchDue() {
+        int sent = 0;
+        for (UUID reminderId : dispatch.dueReminderIds()) {
+            sent += dispatchOne(reminderId);
+        }
+        return sent;
+    }
+
+    /** Delivers the due reminders of one tenant, used by the on-demand run. */
+    public int dispatchDueFor(UUID organizationId) {
+        int sent = 0;
+        for (UUID reminderId : dispatch.dueReminderIdsFor(organizationId)) {
+            sent += dispatchOne(reminderId);
+        }
+        return sent;
+    }
+
+    private int dispatchOne(UUID reminderId) {
+        try {
+            return dispatch.dispatch(reminderId) == ReminderDispatchService.Outcome.SENT ? 1 : 0;
+        } catch (RuntimeException ex) {
+            log.error("Failed to deliver reminder {}", reminderId, ex);
+            return 0;
+        }
     }
 }

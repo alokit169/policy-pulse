@@ -3,7 +3,6 @@ package com.policypulse.reminders;
 import com.policypulse.common.Domain;
 import com.policypulse.customers.Customer;
 import com.policypulse.customers.CustomerRepository;
-import com.policypulse.notifications.NotificationService;
 import com.policypulse.organizations.Organization;
 import com.policypulse.organizations.OrganizationRepository;
 import com.policypulse.policies.Policy;
@@ -45,29 +44,26 @@ public class ReminderDetectionService {
             Domain.PremiumStatus.UPCOMING, Domain.PremiumStatus.DUE, Domain.PremiumStatus.OVERDUE);
 
     private final OrganizationRepository organizations;
-    private final ReminderConfigurationRepository configurations;
+    private final ReminderConfigurations configurationResolver;
     private final PremiumPaymentRepository premiums;
     private final PolicyRepository policies;
     private final CustomerRepository customers;
     private final ReminderRepository reminders;
-    private final NotificationService notifications;
     private final Clock clock;
 
     public ReminderDetectionService(OrganizationRepository organizations,
-                                    ReminderConfigurationRepository configurations,
+                                    ReminderConfigurations configurationResolver,
                                     PremiumPaymentRepository premiums,
                                     PolicyRepository policies,
                                     CustomerRepository customers,
                                     ReminderRepository reminders,
-                                    NotificationService notifications,
                                     Clock clock) {
         this.organizations = organizations;
-        this.configurations = configurations;
+        this.configurationResolver = configurationResolver;
         this.premiums = premiums;
         this.policies = policies;
         this.customers = customers;
         this.reminders = reminders;
-        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -97,7 +93,7 @@ public class ReminderDetectionService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public DetectionResult detectForOrganization(UUID organizationId) {
         Organization organization = organizations.findById(organizationId).orElseThrow();
-        ReminderConfiguration config = configurationFor(organizationId);
+        ReminderConfiguration config = configurationResolver.forOrganization(organizationId);
         ZoneId zone = zoneOf(organization);
 
         // "Today" is the tenant's today. Evaluating an Indian agency's due dates
@@ -189,30 +185,10 @@ public class ReminderDetectionService {
             return false;
         }
 
-        notifications.notifyUser(policy.getOrganizationId(), policy.getAgentId(),
-                titleFor(type, offsetDays),
-                "%s %s, premium %s %s due %s.".formatted(
-                        customer.getFirstName(), customer.getLastName(),
-                        policy.getCurrencyCode(), instalment.getAmount(), instalment.getDueDate()));
+        // Deliberately does not notify anyone here. Delivery belongs to
+        // ReminderDispatchService, which waits until the scheduled moment; doing
+        // it here would make the calling window decorative.
         return true;
-    }
-
-    private String titleFor(Domain.ReminderType type, int offsetDays) {
-        if (type == Domain.ReminderType.PREMIUM_OVERDUE) {
-            return "Premium overdue by %d day%s".formatted(offsetDays, offsetDays == 1 ? "" : "s");
-        }
-        return offsetDays == 0
-                ? "Premium due today"
-                : "Premium due in %d day%s".formatted(offsetDays, offsetDays == 1 ? "" : "s");
-    }
-
-    /** Tenants without their own configuration get one on first use. */
-    private ReminderConfiguration configurationFor(UUID organizationId) {
-        return configurations.findByOrganizationId(organizationId).orElseGet(() -> {
-            ReminderConfiguration created = new ReminderConfiguration();
-            created.setOrganizationId(organizationId);
-            return configurations.save(created);
-        });
     }
 
     /** A bad timezone must not stop a tenant's reminders; fall back to the default. */

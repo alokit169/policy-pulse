@@ -226,8 +226,13 @@ class ReminderDetectionTest extends AbstractIntegrationTest {
         assertThat(remindersOf(agent.getOrganizationId())).isEmpty();
     }
 
+    /**
+     * Detection decides what needs chasing and when; it does not deliver. Sending
+     * here would make the scheduled time decorative, since a reminder raised at
+     * four in the morning would reach the agent immediately.
+     */
     @Test
-    void theAgentHoldingThePolicyIsNotified() {
+    void detectionRaisesTheReminderWithoutDeliveringIt() {
         AppUser agent = agentInOrganizationWith("UTC");
         configure(agent.getOrganizationId(), "0", "");
         Customer customer = customerFor(agent);
@@ -236,12 +241,14 @@ class ReminderDetectionTest extends AbstractIntegrationTest {
 
         detection.detectForOrganization(agent.getOrganizationId());
 
-        List<InAppNotification> sent = notifications
+        assertThat(remindersOf(agent.getOrganizationId()))
+                .singleElement()
+                .extracting(Reminder::getStatus)
+                .isEqualTo(Domain.ReminderStatus.PENDING);
+
+        List<InAppNotification> delivered = notifications
                 .findByUserIdOrderByCreatedAtDesc(agent.getId(), PageRequest.of(0, 10)).getContent();
-        assertThat(sent).hasSize(1);
-        assertThat(sent.get(0).getTitle()).isEqualTo("Premium due today");
-        assertThat(sent.get(0).getBody()).contains("Asha Verma").contains("1000.00");
-        assertThat(sent.get(0).isRead()).isFalse();
+        assertThat(delivered).isEmpty();
     }
 
     /**
