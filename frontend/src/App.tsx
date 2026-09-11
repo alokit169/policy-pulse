@@ -4,6 +4,8 @@ import { useAuth } from './lib/auth'
 import CustomerForm from './pages/CustomerForm'
 import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
+import Policies from './pages/Policies'
+import PolicyForm from './pages/PolicyForm'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 
@@ -12,6 +14,7 @@ import NotFound from './pages/NotFound'
 const NAV = [
   { to: '/', label: 'Dashboard' },
   { to: '/customers', label: 'Customers' },
+  { to: '/policies', label: 'Policies' },
 ]
 
 function AuthenticatedLayout() {
@@ -79,6 +82,9 @@ export default function App() {
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/new" element={<CustomerForm />} />
           <Route path="/customers/:id" element={<CustomerForm />} />
+          <Route path="/policies" element={<Policies />} />
+          <Route path="/policies/new" element={<PolicyForm />} />
+          <Route path="/policies/:id" element={<PolicyForm />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>

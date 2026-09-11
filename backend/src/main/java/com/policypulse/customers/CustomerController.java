@@ -31,9 +31,12 @@ import java.util.UUID;
 @Tag(name = "Customers")
 public class CustomerController {
     private final CustomerService customerService;
+    private final com.policypulse.policies.PolicyService policyService;
 
-    public CustomerController(CustomerService customerService) {
+    public CustomerController(CustomerService customerService,
+                              com.policypulse.policies.PolicyService policyService) {
         this.customerService = customerService;
+        this.policyService = policyService;
     }
 
     @GetMapping
@@ -71,6 +74,12 @@ public class CustomerController {
     @Operation(summary = "Archive a customer, keeping their history")
     public void archive(@PathVariable UUID id) {
         customerService.archive(id);
+    }
+
+    @GetMapping("/{id}/policies")
+    @Operation(summary = "Policies held by this customer")
+    public java.util.List<com.policypulse.policies.PolicyResponse> policies(@PathVariable UUID id) {
+        return policyService.forCustomer(id);
     }
 
     @PostMapping("/{id}/restore")

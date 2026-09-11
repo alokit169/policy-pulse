@@ -9,6 +9,9 @@ import java.util.UUID;
 
 public interface PremiumPaymentRepository extends JpaRepository<PremiumPayment, UUID> {
     List<PremiumPayment> findByPolicyIdOrderByDueDateDesc(UUID policyId);
+
+    /** Schedules read oldest-first; covered by ix_premium_payments_policy_due. */
+    List<PremiumPayment> findByPolicyIdOrderByDueDateAsc(UUID policyId);
     List<PremiumPayment> findByOrganizationIdAndStatusIn(UUID orgId, List<Domain.PremiumStatus> statuses);
     List<PremiumPayment> findByOrganizationIdAndStatusAndDueDateBetween(
             UUID orgId, Domain.PremiumStatus status, LocalDate from, LocalDate to);

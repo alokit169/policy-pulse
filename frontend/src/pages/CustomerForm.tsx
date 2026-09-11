@@ -10,6 +10,8 @@ import {
   updateCustomer,
 } from '../lib/customers'
 import type { Customer, CustomerInput } from '../lib/customers'
+import { formatMoney, listCustomerPolicies } from '../lib/policies'
+import type { Policy } from '../lib/policies'
 
 const EMPTY: CustomerInput = {
   firstName: '',
@@ -67,6 +69,7 @@ export default function CustomerForm() {
 
   const [form, setForm] = useState<CustomerInput>(EMPTY)
   const [existing, setExisting] = useState<Customer | null>(null)
+  const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +77,16 @@ export default function CustomerForm() {
   useEffect(() => {
     if (!id) return
     let cancelled = false
+
+    listCustomerPolicies(id)
+      .then((held) => {
+        if (!cancelled) setPolicies(held)
+      })
+      .catch(() => {
+        // The customer itself failing is what gets reported; an empty list here
+        // is not worth a second error banner.
+        if (!cancelled) setPolicies([])
+      })
 
     getCustomer(id)
       .then((customer) => {
@@ -261,6 +274,39 @@ export default function CustomerForm() {
           </Link>
         </div>
       </form>
+
+      {existing && (
+        <section className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">Policies</h2>
+            <Link
+              to={`/policies/new?customerId=${existing.id}`}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+            >
+              New policy
+            </Link>
+          </div>
+
+          {policies.length === 0 ? (
+            <p className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+              No policies for this customer yet.
+            </p>
+          ) : (
+            <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+              {policies.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <Link to={`/policies/${p.id}`} className="font-mono text-xs font-medium text-slate-900 hover:underline">
+                    {p.policyNumber}
+                  </Link>
+                  <span className="text-slate-600">{p.insuranceProvider}</span>
+                  <span className="text-slate-700">{formatMoney(p.premiumAmount, p.currencyCode)}</span>
+                  <span className="text-slate-500">next due {p.nextPremiumDueDate ?? '—'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   )
 }

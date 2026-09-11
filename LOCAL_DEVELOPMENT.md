@@ -145,6 +145,9 @@ performs. Docker must be running.
 | `AuthIntegrationTest` | Login, token issue, enumeration resistance, live revocation, audit |
 | `CustomerIsolationTest` | Tenant and role isolation: no cross-tenant or cross-agent access |
 | `CustomerCrudTest` | Create, update, archive, restore, search, paging, conflicts |
+| `PolicyIsolationTest` | Policies stay in their tenant, including the customer they reference |
+| `PolicyPremiumTest` | Schedule generation, payment, waiving, money scale |
+| `PremiumScheduleTest` | Due-date arithmetic, including month-end and leap years |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 

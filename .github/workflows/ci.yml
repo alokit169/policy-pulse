@@ -144,6 +144,44 @@ jobs:
           check "unknown customer"  404 -H "$AUTH" \
                                         http://localhost:5173/api/customers/00000000-0000-0000-0000-000000000000
 
+          # A policy needs a customer of its own, since the one above is reused
+          # by the duplicate-phone check.
+          CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
+                       -H "$AUTH" -H "$JSON" \
+                       -d "{\"firstName\":\"Policy\",\"lastName\":\"Holder\",\"phone\":\"${PHONE}9\"}" \
+                     | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          if [ -z "$CUSTOMER" ]; then
+            echo "FAIL  could not create a customer for the policy"; exit 1
+          fi
+
+          POLICY_BODY="{\"customerId\":\"$CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"ENDOWMENT\",\"premiumAmount\":\"12000.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"2024-01-01\",\"policyEndDate\":\"2027-01-01\"}"
+
+          check "policy list"       200 -H "$AUTH" http://localhost:5173/api/policies
+          check "policy create"     201 -X POST http://localhost:5173/api/policies \
+                                        -H "$AUTH" -H "$JSON" -d "$POLICY_BODY"
+          check "bad premium"       400 -X POST http://localhost:5173/api/policies \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"$CUSTOMER\",\"insuranceProvider\":\"X\",\"policyType\":\"Y\",\"premiumAmount\":\"-1\",\"premiumFrequency\":\"YEARLY\"}"
+          check "foreign customer"  404 -X POST http://localhost:5173/api/policies \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"00000000-0000-0000-0000-000000000000\",\"insuranceProvider\":\"X\",\"policyType\":\"Y\",\"premiumAmount\":\"100.00\",\"premiumFrequency\":\"YEARLY\"}"
+
+          POLICY=$(curl -s -X POST http://localhost:5173/api/policies \
+                     -H "$AUTH" -H "$JSON" \
+                     -d "{\"customerId\":\"$CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"500.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"2024-01-01\",\"policyEndDate\":\"2026-01-01\"}" \
+                   | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          check "premium schedule"  200 -H "$AUTH" "http://localhost:5173/api/policies/$POLICY/premiums"
+
+          # The schedule must actually have been generated: 2024, 2025 and 2026.
+          INSTALMENTS=$(curl -s -H "$AUTH" "http://localhost:5173/api/policies/$POLICY/premiums" \
+                        | grep -o '"dueDate"' | wc -l | tr -d ' ')
+          if [ "$INSTALMENTS" = "3" ]; then
+            echo "ok    schedule generated (3 instalments)"
+          else
+            echo "FAIL  schedule generated: expected 3 instalments, got $INSTALMENTS"
+            failed=1
+          fi
+
           exit $failed
 
       - name: Dump logs on failure

@@ -12,6 +12,7 @@ Migrations live in `backend/src/main/resources/db/migration` and are named
 | `V1__init` | All thirteen tables, constraints and indexes |
 | `V2__auth_and_audit` | Globally unique user email, audit log indexes |
 | `V3__token_revocation` | `users.token_version` |
+| `V4__premium_schedule` | Unique instalment per policy and due date |
 
 ### Rules
 
@@ -54,8 +55,13 @@ email therefore identifies exactly one user.
 | Table | Notes |
 | --- | --- |
 | `customers` | Unique `(organization_id, customer_number)` and `(organization_id, phone)` |
-| `policies` | References a customer |
-| `premium_payments` | Premium instalments and their status |
+| `policies` | References a customer. Unique `(organization_id, policy_number)` |
+| `premium_payments` | Instalments, unique per `(policy_id, due_date)` |
+
+A policy's schedule is generated from its start date, end date and frequency.
+Regenerating it after the terms change leaves paid and waived instalments
+untouched and drops only unsettled ones, so a premium that was actually
+collected survives a correction to the policy.
 
 Customers are archived (`status = INACTIVE`) rather than deleted, because
 policies and premium history reference them.

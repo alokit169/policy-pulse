@@ -15,6 +15,8 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID> {
     Page<Policy> findByOrganizationId(UUID orgId, Pageable pageable);
     Page<Policy> findByOrganizationIdAndAgentId(UUID orgId, UUID agentId, Pageable pageable);
     Page<Policy> findByOrganizationIdAndStatus(UUID orgId, Domain.PolicyStatus status, Pageable pageable);
+    Page<Policy> findByOrganizationIdAndAgentIdAndStatus(
+            UUID orgId, UUID agentId, Domain.PolicyStatus status, Pageable pageable);
     List<Policy> findByOrganizationIdAndStatusAndNextPremiumDueDateBetween(
             UUID orgId, Domain.PolicyStatus status, LocalDate from, LocalDate to);
     List<Policy> findByOrganizationIdAndStatusAndMaturityDateBetween(

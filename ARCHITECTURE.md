@@ -28,8 +28,8 @@ flowchart LR
 | `users` | Users and roles |
 | `organizations` | Tenants and reminder config |
 | `customers` | Customer CRM, scoped to the caller's tenant |
-| `policies` | Policies |
-| `premiums` | PremiumPayment records |
+| `policies` | Policies, scoped to the caller's tenant |
+| `premiums` | Instalment schedules and recorded payments |
 | `reminders` | Reminder entities and detection |
 | `notifications` | In-app + provider abstraction |
 | `ai` | AIProvider, intent, context, validation |
