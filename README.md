@@ -1,6 +1,6 @@
-# AI-Powered Insurance Agent Management & Customer Engagement Platform
+# Policy Pulse
 
-Production-oriented web platform for insurance agents and agencies: customers, policies, premiums, reminders, AI-assisted follow-ups, and (mocked) voice engagement.
+AI-powered insurance agent management and customer engagement platform. Production-oriented web app for insurance agents and agencies: customers, policies, premiums, reminders, AI-assisted follow-ups, and (mocked) voice engagement.
 
 Not affiliated with LIC. Provider names are data fields.
 

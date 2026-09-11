@@ -1,4 +1,4 @@
--- V1 schema: AI-Powered Insurance Agent Management & Customer Engagement Platform
+-- V1 schema: Policy Pulse
 
 CREATE TABLE organizations (
     id UUID PRIMARY KEY,

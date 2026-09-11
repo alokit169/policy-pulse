@@ -1,10 +1,10 @@
 spring:
   application:
-    name: insurance-agent-platform
+    name: policy-pulse
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/insureplatform}
-    username: ${DATABASE_USERNAME:insure}
-    password: ${DATABASE_PASSWORD:insure}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/policypulse}
+    username: ${DATABASE_USERNAME:policypulse}
+    password: ${DATABASE_PASSWORD:policypulse}
   jpa:
     hibernate:
       ddl-auto: validate

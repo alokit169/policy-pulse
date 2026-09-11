@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: insureplatform
-      POSTGRES_USER: insure
-      POSTGRES_PASSWORD: insure
+      POSTGRES_DB: policypulse
+      POSTGRES_USER: policypulse
+      POSTGRES_PASSWORD: policypulse
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U insure -d insureplatform"]
+      test: ["CMD-SHELL", "pg_isready -U policypulse -d policypulse"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,9 +21,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/insureplatform
-      SPRING_DATASOURCE_USERNAME: insure
-      SPRING_DATASOURCE_PASSWORD: insure
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/policypulse
+      SPRING_DATASOURCE_USERNAME: policypulse
+      SPRING_DATASOURCE_PASSWORD: policypulse
       JWT_SECRET: local-dev-only-change-me-use-32-chars-min!!
       APP_SEED: "true"
       AI_PROVIDER: mock

@@ -9,11 +9,11 @@
         <version>3.3.5</version>
         <relativePath/>
     </parent>
-    <groupId>com.insureplatform</groupId>
-    <artifactId>insurance-agent-platform</artifactId>
+    <groupId>com.policypulse</groupId>
+    <artifactId>policy-pulse</artifactId>
     <version>0.1.0</version>
-    <name>AI-Powered Insurance Agent Management &amp; Customer Engagement Platform</name>
-    <description>Multi-tenant insurance agent CRM with AI follow-ups</description>
+    <name>Policy Pulse</name>
+    <description>Policy Pulse - AI-powered insurance agent management and customer engagement platform</description>
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>

@@ -1,6 +1,6 @@
 # Architecture
 
-**Product:** AI-Powered Insurance Agent Management & Customer Engagement Platform
+**Product:** Policy Pulse — AI-powered insurance agent management & customer engagement platform
 
 Generic multi-tenant insurance CRM for agencies and independent agents. LIC is example data only — never hard-coded business logic.
 
@@ -67,7 +67,7 @@ AI never writes `PremiumPayment.status = PAID`. `PAYMENT_CONFIRMED` creates pend
 ## Folder structure
 
 ```
-backend/src/main/java/com/insureplatform/...
+backend/src/main/java/com/policypulse/...
 frontend/src/pages/...
 docs via README, LOCAL_DEVELOPMENT, DATABASE, API, AI_ARCHITECTURE, VOICE, SECURITY, DEPLOYMENT
 ```
