@@ -27,6 +27,8 @@ app:
   # assertions about how many reminders exist.
   reminders:
     scheduler-enabled: false
+  follow-ups:
+    scheduler-enabled: false
   jwt:
     secret: test-secret-test-secret-test-secret-32
     expiration-ms: 86400000

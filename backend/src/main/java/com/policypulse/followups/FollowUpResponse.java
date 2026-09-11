@@ -17,6 +17,8 @@ public record FollowUpResponse(
         Instant dueAt,
         Domain.FollowUpStatus status,
         String notes,
+        /** Set once a broken promise has been handed to a person. */
+        Instant escalatedAt,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -24,6 +26,6 @@ public record FollowUpResponse(
         return new FollowUpResponse(
                 f.getId(), f.getCustomerId(), f.getPolicyId(), f.getConversationId(),
                 f.getAssignedAgentId(), f.getReason(), f.getCommitmentDate(), f.getDueAt(),
-                f.getStatus(), f.getNotes(), f.getCreatedAt(), f.getUpdatedAt());
+                f.getStatus(), f.getNotes(), f.getEscalatedAt(), f.getCreatedAt(), f.getUpdatedAt());
     }
 }

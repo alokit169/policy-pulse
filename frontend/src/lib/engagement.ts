@@ -53,8 +53,21 @@ export type FollowUp = {
   dueAt: string
   status: FollowUpStatus
   notes: string | null
+  /** Set once a broken promise has been handed to a person. */
+  escalatedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export async function runFollowUpEngine(): Promise<{
+  broughtDue: number
+  settled: number
+  escalated: number
+}> {
+  const res = await api.post<{ broughtDue: number; settled: number; escalated: number }>(
+    '/follow-ups/run',
+  )
+  return res.data
 }
 
 export async function listConversations(params: { page?: number; size?: number }) {

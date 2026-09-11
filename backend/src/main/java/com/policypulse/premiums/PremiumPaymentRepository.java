@@ -2,6 +2,8 @@ package com.policypulse.premiums;
 
 import com.policypulse.common.Domain;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -23,4 +25,23 @@ public interface PremiumPaymentRepository extends JpaRepository<PremiumPayment, 
     List<PremiumPayment> findByOrganizationIdAndDueDateAndStatusIn(
             UUID organizationId, LocalDate dueDate, java.util.Collection<Domain.PremiumStatus> statuses);
     List<PremiumPayment> findByOrganizationIdAndVerificationPendingTrue(UUID orgId);
+
+    /**
+     * Whether anything on this policy that was owed by a given day is still
+     * owed. Asked by date rather than by the stored status: an instalment's
+     * status is written when it is created and only changed by a payment or a
+     * waiver, so one raised as UPCOMING is still marked UPCOMING long after its
+     * date has passed. The date is the fact; the status is a label.
+     */
+    @Query("""
+            SELECT COUNT(p) FROM PremiumPayment p
+            WHERE p.policyId = :policy
+              AND p.dueDate <= :on
+              AND p.status <> com.policypulse.common.Domain$PremiumStatus.PAID
+              AND p.status <> com.policypulse.common.Domain$PremiumStatus.WAIVED
+            """)
+    long countOwedOnOrBefore(@Param("policy") UUID policyId, @Param("on") LocalDate on);
+
+    /** Somebody is already checking a claimed payment against the books. */
+    long countByPolicyIdAndVerificationPendingTrue(UUID policyId);
 }

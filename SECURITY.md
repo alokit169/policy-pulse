@@ -167,6 +167,26 @@ Phone numbers are masked in logs.
 > fails loudly. Silently placing no calls would be the failure noticed last:
 > reminders would keep being marked as attempted and nobody would ever be rung.
 
+## What the follow-up engine may do
+
+It runs from a scheduler with nobody signed in, so it reaches for no security
+context, and every record it writes carries the tenant taken from the follow-up
+rather than from a caller. Each tenant is worked through in its own transaction,
+so one agency's bad data cannot roll back another's.
+
+**It reads what is owed and never writes it.** A follow-up closing on its own is a
+statement about work, not about money: the payment it noticed was recorded by a
+person, through the premium service, before the engine ever ran. The same rule as
+the assistant, for the same reason.
+
+**A claimed payment somebody is checking is not called a broken promise.** When a
+customer says they have already paid, the instalment is flagged and a person is
+asked to check it. Announcing a broken promise while that is open is how a
+customer who did pay gets chased anyway.
+
+**A promise is only broken once the day it named has passed.** Somebody who said
+Friday has all of Friday, and it is escalated once rather than every hour.
+
 ## Known gaps
 
 These are understood and deferred, not overlooked.

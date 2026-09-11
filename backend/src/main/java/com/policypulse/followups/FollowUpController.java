@@ -51,6 +51,15 @@ public class FollowUpController {
         return followUpService.create(request);
     }
 
+    @PostMapping("/run")
+    @Operation(summary = "Work through the caller's organization's due follow-ups now")
+    public Map<String, Integer> runNow() {
+        FollowUpEngine.Result result = followUpService.runNow();
+        return Map.of("broughtDue", result.broughtDue(),
+                "settled", result.settled(),
+                "escalated", result.escalated());
+    }
+
     @PostMapping("/{id}/complete")
     @Operation(summary = "Mark a follow-up done")
     public FollowUpResponse complete(@PathVariable UUID id,

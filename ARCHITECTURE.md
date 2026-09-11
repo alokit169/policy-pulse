@@ -35,7 +35,7 @@ flowchart LR
 | `ai` | AIProvider, intent, context, and the validation that bounds it |
 | `voice` | Placing calls: the calling window, attempt limits, and what a call leaves behind |
 | `conversations` | Calls and transcripts, written either by an agent or by a placed call |
-| `followups` | Commitments, owned by the customer's own agent |
+| `followups` | Commitments, and the engine that brings them due, closes the kept ones and escalates the broken ones |
 | `dashboard` | Aggregates and action-required, counted in the database |
 | `audit` | Audit log writer |
 | `reports` | CSV/report queries |
@@ -55,6 +55,8 @@ sequenceDiagram
   participant AI as AIProvider
   participant Val as ActionValidationService
   participant Biz as FollowUp and Premium services
+  participant Eng as FollowUpEngine
+  participant Task as HumanTask
   Sch->>Rem: due reminders
   Rem->>Rem: consent, at detection
   Rem->>Call: a voice reminder
@@ -65,7 +67,10 @@ sequenceDiagram
   Conv->>AI: read on request
   AI->>Val: structured intent
   Val->>Biz: PAYMENT_COMMITMENT
-  Biz->>Biz: FollowUp for next day
+  Biz->>Biz: FollowUp for the day they named
+  Eng->>Biz: on the day, read the books
+  Eng->>Eng: paid, so close it
+  Eng->>Task: the day passed unpaid, so tell a person
 ```
 
 AI never writes `PremiumPayment.status = PAID`. `PAYMENT_CONFIRMED` creates pending verification and a HumanTask.
@@ -73,6 +78,11 @@ AI never writes `PremiumPayment.status = PAID`. `PAYMENT_CONFIRMED` creates pend
 A call is not retried for ever: past the tenant's attempt limit, or against a
 number that cannot be dialled, the reminder is given up on and a HumanTask is
 raised, so the work becomes somebody's rather than disappearing.
+
+Nor is a commitment recorded and then forgotten. The engine reads the books before
+anyone is asked to chase a payment, so a promise already kept closes itself; one
+the day has passed on is handed to a person, once. It reads what is owed and never
+writes it.
 
 ## Folder structure
 

@@ -158,6 +158,7 @@ performs. Docker must be running.
 | `DashboardTest` | Aggregates, agent and tenant scoping, rupee totals |
 | `ConversationTest` | Transcripts, closing, tenant and agent visibility |
 | `FollowUpTest` | Commitments, ownership, timezone-aware due moments |
+| `FollowUpEngineTest` | Promises kept closing themselves, promises broken reaching a person |
 | `AiSafetyTest` | What the assistant may cause, and above all what it may not |
 | `MockAIProviderTest` | Intent rules, including that only the customer is read |
 | `VoiceCallTest` | The calling window, attempt limits, retries and the transcript a call leaves |
@@ -180,6 +181,20 @@ so a SPA can tell the two apart.
 
 CI runs the same suite plus the frontend build and a smoke test of the full
 Docker stack. See `.github/workflows/ci.yml`.
+
+### Watching a promise be kept or broken
+
+The engine runs hourly, and `POST /api/follow-ups/run` does one tenant now. As a
+manager, the Follow-ups page has the same button.
+
+Record a commitment against a policy with an unpaid premium, then run it: the
+follow-up comes due and the customer's agent is told. Record the payment and run
+it again — the follow-up closes itself, because nobody should be sent to ring
+somebody who has already paid.
+
+A promise is only broken once the day it named has passed, so that half cannot be
+produced by clicking: the API will not accept a commitment for a day already gone.
+`FollowUpEngineTest` covers it against a frozen clock.
 
 ### Watching a call happen
 

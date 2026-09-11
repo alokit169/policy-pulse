@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
-import { cancelFollowUp, completeFollowUp, listFollowUps } from '../lib/engagement'
+import { useAuth } from '../lib/auth'
+import { cancelFollowUp, completeFollowUp, listFollowUps, runFollowUpEngine } from '../lib/engagement'
 import type { FollowUp, FollowUpStatus } from '../lib/engagement'
 
 const PAGE_SIZE = 20
@@ -33,7 +34,10 @@ function isOverdue(followUp: FollowUp): boolean {
 }
 
 export default function FollowUps() {
+  const { user } = useAuth()
+  const canManage = user?.role !== 'AGENT'
   const [status, setStatus] = useState<FollowUpStatus | ''>('')
+  const [notice, setNotice] = useState<string | null>(null)
   const [rows, setRows] = useState<FollowUp[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -64,6 +68,26 @@ export default function FollowUps() {
     }
   }, [status, reloadToken])
 
+  async function onRunNow() {
+    setError(null)
+    setNotice(null)
+    setBusy(true)
+    try {
+      const result = await runFollowUpEngine()
+      const parts = [
+        `${result.broughtDue} came due`,
+        `${result.settled} had already been paid`,
+        `${result.escalated} promise${result.escalated === 1 ? '' : 's'} broken`,
+      ]
+      setNotice(`${parts.join(', ')}. Running this again is always safe.`)
+      setReloadToken((t) => t + 1)
+    } catch (err) {
+      setError(errorMessage(err, 'Could not work through the follow-ups'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function settle(id: string, action: 'complete' | 'cancel') {
     setError(null)
     setBusy(true)
@@ -87,6 +111,17 @@ export default function FollowUps() {
             {loading ? 'Loading…' : `${total} ${total === 1 ? 'follow-up' : 'follow-ups'}`}
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => void onRunNow()}
+            disabled={busy}
+            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+          >
+            Work through them now
+          </button>
+        )}
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as FollowUpStatus | '')}
@@ -99,12 +134,16 @@ export default function FollowUps() {
           <option value="COMPLETED">Completed</option>
           <option value="CANCELLED">Cancelled</option>
         </select>
+        </div>
       </div>
 
       {error && (
         <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
+      )}
+      {notice && (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</p>
       )}
 
       {!loading && rows.length === 0 ? (
@@ -143,10 +182,16 @@ export default function FollowUps() {
                   </td>
                   <td className="px-4 py-3 text-slate-700">
                     {when(f.dueAt)}
-                    {isOverdue(f) && (
-                      <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                        overdue
+                    {f.escalatedAt ? (
+                      <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                        promise broken
                       </span>
+                    ) : (
+                      isOverdue(f) && (
+                        <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                          overdue
+                        </span>
+                      )
                     )}
                   </td>
                   <td className="px-4 py-3">

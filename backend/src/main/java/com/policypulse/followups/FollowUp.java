@@ -23,6 +23,8 @@ public class FollowUp {
     private Domain.FollowUpStatus status;
     @Column(columnDefinition = "TEXT")
     private String notes;
+    /** When a broken promise was handed to a person. Null until it is. */
+    private Instant escalatedAt;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -60,6 +62,8 @@ public class FollowUp {
     public void setStatus(Domain.FollowUpStatus status) { this.status = status; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    public Instant getEscalatedAt() { return escalatedAt; }
+    public void setEscalatedAt(Instant escalatedAt) { this.escalatedAt = escalatedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

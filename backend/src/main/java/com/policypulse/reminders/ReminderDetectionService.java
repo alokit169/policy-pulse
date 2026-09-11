@@ -83,10 +83,7 @@ public class ReminderDetectionService {
      * the looping from outside instead.
      */
     public List<UUID> activeOrganizationIds() {
-        return organizations.findAll().stream()
-                .filter(o -> o.getStatus() == Domain.EntityStatus.ACTIVE)
-                .map(Organization::getId)
-                .toList();
+        return organizations.findIdsByStatus(Domain.EntityStatus.ACTIVE);
     }
 
     /**

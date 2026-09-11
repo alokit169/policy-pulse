@@ -40,6 +40,7 @@ public class FollowUpService {
     private static final LocalTime START_OF_WORKING_DAY = LocalTime.of(9, 0);
 
     private final FollowUpRepository followUps;
+    private final FollowUpRunner runner;
     private final CustomerRepository customers;
     private final PolicyRepository policies;
     private final ConversationRepository conversations;
@@ -47,10 +48,12 @@ public class FollowUpService {
     private final AuditService audit;
     private final Clock clock;
 
-    public FollowUpService(FollowUpRepository followUps, CustomerRepository customers,
+    public FollowUpService(FollowUpRepository followUps, FollowUpRunner runner,
+                           CustomerRepository customers,
                            PolicyRepository policies, ConversationRepository conversations,
                            OrganizationZones zones, AuditService audit, Clock clock) {
         this.followUps = followUps;
+        this.runner = runner;
         this.customers = customers;
         this.policies = policies;
         this.conversations = conversations;
@@ -133,6 +136,19 @@ public class FollowUpService {
                 caller.getOrganizationId(), caller.getId(), caller.getUsername(),
                 "reason=" + followUp.getReason());
         return FollowUpResponse.of(followUp);
+    }
+
+    /**
+     * Works through the caller's own tenant now. The scheduler covers every
+     * tenant on its own; this exists so the effect of a payment being recorded
+     * can be seen without waiting for the next sweep.
+     */
+    public FollowUpEngine.Result runNow() {
+        AuthUser caller = SecurityUtil.current();
+        if (caller.role() == Domain.Role.AGENT) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Only managers can run the follow-up engine");
+        }
+        return runner.runFor(caller.getOrganizationId());
     }
 
     @Transactional

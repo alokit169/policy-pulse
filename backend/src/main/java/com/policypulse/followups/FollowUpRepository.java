@@ -27,6 +27,14 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, UUID> {
 
     List<FollowUp> findByCustomerIdOrderByDueAtAsc(UUID customerId);
 
+    /**
+     * One tenant's outstanding follow-ups whose moment has passed, oldest first.
+     * Bounded, so a tenant that has let a year of work pile up cannot make one
+     * sweep try to load all of it.
+     */
+    List<FollowUp> findTop200ByOrganizationIdAndStatusInAndDueAtLessThanEqualOrderByDueAtAsc(
+            UUID organizationId, List<Domain.FollowUpStatus> statuses, Instant dueAt);
+
     /** Outstanding work already past its moment, for the dashboard. */
     long countByOrganizationIdAndStatusInAndDueAtBefore(
             UUID organizationId, List<Domain.FollowUpStatus> statuses, Instant before);

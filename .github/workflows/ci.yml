@@ -370,6 +370,87 @@ jobs:
             fi
           fi
 
+          # The follow-up engine. A commitment for a day that has passed, with the
+          # money still owed, has to reach a person; one already paid has to close
+          # itself without anybody being sent to chase it.
+          check "agent may not run the engine" 403 -X POST -H "$AUTH" http://localhost:5173/api/follow-ups/run
+
+          YESTERDAY=$(TZ="$TENANT_TZ" date -d 'yesterday' +%Y-%m-%d)
+
+          BROKEN_CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
+                              -H "$AUTH" -H "$JSON" \
+                              -d "{\"firstName\":\"Broken\",\"lastName\":\"Promise\",\"phone\":\"${PHONE}5\"}" \
+                            | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          BROKEN_POLICY=$(curl -s -X POST http://localhost:5173/api/policies \
+                            -H "$AUTH" -H "$JSON" \
+                            -d "{\"customerId\":\"$BROKEN_CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"3000.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"$YESTERDAY\",\"policyEndDate\":\"$YESTERDAY\"}" \
+                          | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+
+          # A commitment cannot be recorded for a day already gone, so a promise
+          # that is genuinely broken cannot be built through the API inside one
+          # run. What this proves is the wiring and the near edge: a commitment
+          # comes due, is not called broken while the day it names still has time
+          # to run, and is not announced twice. The calendar itself — the day
+          # passing, the escalation, the task raised once — is FollowUpEngineTest,
+          # against a frozen clock.
+          check "record a commitment" 201 -X POST http://localhost:5173/api/follow-ups \
+                                        -H "$AUTH" -H "$JSON" \
+                                        -d "{\"customerId\":\"$BROKEN_CUSTOMER\",\"policyId\":\"$BROKEN_POLICY\",\"reason\":\"PAYMENT_COMMITMENT\",\"commitmentDate\":\"$TENANT_TODAY\"}"
+
+          RUN=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run)
+          if echo "$RUN" | grep -q '"broughtDue":0'; then
+            echo "FAIL  a commitment due today did not come due: $RUN"
+            failed=1
+          else
+            echo "ok    a commitment due today came due"
+          fi
+          if echo "$RUN" | grep -q '"escalated":0'; then
+            echo "ok    a promise with the day still to run was not called broken"
+          else
+            echo "FAIL  a promise was called broken on the day it was made for: $RUN"
+            failed=1
+          fi
+
+          # Running again must not tell anybody a second time.
+          AGAIN=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run)
+          if echo "$AGAIN" | grep -q '"broughtDue":0'; then
+            echo "ok    the engine is repeatable (nobody was told twice)"
+          else
+            echo "FAIL  the engine brought the same follow-up due again: $AGAIN"
+            failed=1
+          fi
+
+          # A promise already kept closes itself rather than sending somebody to
+          # ring a customer who has paid.
+          PAID_CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
+                            -H "$AUTH" -H "$JSON" \
+                            -d "{\"firstName\":\"Already\",\"lastName\":\"Paid\",\"phone\":\"${PHONE}6\"}" \
+                          | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          PAID_POLICY=$(curl -s -X POST http://localhost:5173/api/policies \
+                          -H "$AUTH" -H "$JSON" \
+                          -d "{\"customerId\":\"$PAID_CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"3000.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"$TENANT_TODAY\",\"policyEndDate\":\"$TENANT_TODAY\"}" \
+                        | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          PAID_PREMIUM=$(curl -s -H "$AUTH" "http://localhost:5173/api/policies/$PAID_POLICY/premiums" \
+                         | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+
+          FOLLOW_UP=$(curl -s -X POST http://localhost:5173/api/follow-ups \
+                        -H "$AUTH" -H "$JSON" \
+                        -d "{\"customerId\":\"$PAID_CUSTOMER\",\"policyId\":\"$PAID_POLICY\",\"reason\":\"PAYMENT_COMMITMENT\",\"commitmentDate\":\"$TENANT_TODAY\"}" \
+                      | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+
+          check "record the payment" 200 \
+                -X POST "http://localhost:5173/api/policies/$PAID_POLICY/premiums/$PAID_PREMIUM/pay" \
+                -H "$AUTH" -H "$JSON" -d '{"paymentMethod":"UPI"}'
+
+          curl -s -o /dev/null -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run
+          SETTLED=$(curl -s -H "$AUTH" "http://localhost:5173/api/follow-ups/$FOLLOW_UP")
+          if echo "$SETTLED" | grep -q '"status":"COMPLETED"'; then
+            echo "ok    a promise already kept closed itself"
+          else
+            echo "FAIL  nobody paid attention to the payment: $SETTLED"
+            failed=1
+          fi
+
           exit $failed
 
       - name: Dump logs on failure
