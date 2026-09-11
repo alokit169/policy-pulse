@@ -15,6 +15,7 @@ Migrations live in `backend/src/main/resources/db/migration` and are named
 | `V4__premium_schedule` | Unique instalment per policy and due date |
 | `V5__premium_optimistic_locking` | `premium_payments.version` |
 | `V6__reminder_queries` | Indexes for reminder listing, detection and unread counts |
+| `V7__single_currency` | Rupees only, enforced by a check constraint |
 
 ### Rules
 
@@ -109,10 +110,12 @@ attempt rather than rolling the record back with it.
 
 ## Reading money across records
 
-Currency belongs to the policy, so one tenant can hold both rupee and dollar
-policies. Any total that spans policies is therefore grouped by currency and the
-figures are never added together; only the instalment count is combined. The
-dashboard queries do this in SQL.
+Every policy is in rupees. `policies.currency_code` carries a check constraint
+that allows only `INR`, and the API rejects anything else, so a total that spans
+policies is provably meaningful rather than meaningful by convention. Allowing a
+second currency would start with dropping that constraint, and would then require
+every total to be grouped by currency: adding dollars to rupees produces a number
+that means nothing.
 
 Whether a premium is overdue is decided by its due date, not by its stored
 status. A status is written when the schedule is generated and is not rewritten

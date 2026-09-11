@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { getDashboard } from '../lib/dashboard'
-import type { CurrencyAmount, Dashboard as DashboardData, Money } from '../lib/dashboard'
+import type { Dashboard as DashboardData, Money } from '../lib/dashboard'
 import { formatMoney } from '../lib/policies'
 
 /**
@@ -27,24 +27,6 @@ function StatTile({
       <div className="mt-1 text-2xl font-semibold text-slate-900">{children}</div>
       {footnote && <p className="mt-1 text-xs text-slate-500">{footnote}</p>}
     </div>
-  )
-}
-
-/**
- * Currencies are listed separately, never summed. A tenant can hold rupee and
- * dollar policies at once and one combined figure would be meaningless.
- */
-function Amounts({ amounts, emptyLabel = '—' }: { amounts: CurrencyAmount[]; emptyLabel?: string }) {
-  if (amounts.length === 0) return <span className="text-slate-400">{emptyLabel}</span>
-  return (
-    <span>
-      {amounts.map((a, index) => (
-        <span key={a.currencyCode}>
-          {index > 0 && <span className="mx-1 text-slate-300">·</span>}
-          {formatMoney(a.amount, a.currencyCode)}
-        </span>
-      ))}
-    </span>
   )
 }
 
@@ -113,7 +95,7 @@ export default function Dashboard() {
                 nothingOverdue ? 'text-slate-400' : 'text-red-800'
               }`}
             >
-              <Amounts amounts={data.overdue.amounts} emptyLabel="All clear" />
+              {nothingOverdue ? 'All clear' : formatMoney(data.overdue.amount)}
             </p>
             <p className="mt-2 text-sm text-slate-600">
               {nothingOverdue
@@ -134,10 +116,10 @@ export default function Dashboard() {
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Due in the next 7 days" footnote={countLabel(data.dueNextSevenDays, 'instalment')}>
-          <Amounts amounts={data.dueNextSevenDays.amounts} />
+          {formatMoney(data.dueNextSevenDays.amount)}
         </StatTile>
         <StatTile label="Collected this month" footnote={countLabel(data.collectedThisMonth, 'payment')}>
-          <Amounts amounts={data.collectedThisMonth.amounts} />
+          {formatMoney(data.collectedThisMonth.amount)}
         </StatTile>
         <StatTile label="Active customers">{data.activeCustomers}</StatTile>
         <StatTile label="Active policies">{data.activePolicies}</StatTile>

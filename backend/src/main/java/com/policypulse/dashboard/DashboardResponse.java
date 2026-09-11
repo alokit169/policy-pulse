@@ -2,7 +2,6 @@ package com.policypulse.dashboard;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,31 +34,21 @@ public record DashboardResponse(
     }
 
     /**
-     * A count of instalments with their totals.
+     * A count of instalments and what they come to.
      *
-     * <p>Totals are per currency and never added together. Currency belongs to
-     * the policy, so a tenant can hold rupee and dollar policies at once, and one
-     * combined figure would be adding dollars to rupees. The count is
-     * currency-agnostic and safe to show on its own.
+     * <p>Safe to add up because every policy is in rupees, which the database
+     * enforces. Were more than one currency ever allowed, this would have to
+     * become a total per currency: adding dollars to rupees produces a number
+     * that means nothing.
      */
-    public record Money(long count, List<CurrencyAmount> amounts) {
+    public record Money(long count, BigDecimal amount) {
 
-        static Money of(List<DashboardRepository.CurrencyTotal> totals) {
-            long count = totals.stream().mapToLong(DashboardRepository.CurrencyTotal::getItemCount).sum();
-
-            List<CurrencyAmount> amounts = totals.stream()
-                    .map(t -> new CurrencyAmount(
-                            t.getCurrencyCode(),
-                            t.getTotalAmount() == null ? BigDecimal.ZERO : t.getTotalAmount()))
-                    // Stable order, so the page does not reshuffle between loads.
-                    .sorted(Comparator.comparing(CurrencyAmount::currencyCode))
-                    .toList();
-
-            return new Money(count, amounts);
+        static Money of(DashboardRepository.MoneySummary summary) {
+            if (summary == null) return new Money(0, BigDecimal.ZERO);
+            return new Money(
+                    summary.getItemCount(),
+                    summary.getTotalAmount() == null ? BigDecimal.ZERO : summary.getTotalAmount());
         }
-    }
-
-    public record CurrencyAmount(String currencyCode, BigDecimal amount) {
     }
 
     /** An overdue premium, with enough detail to act on without another request. */

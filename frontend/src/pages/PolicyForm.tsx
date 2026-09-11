@@ -259,9 +259,6 @@ export default function PolicyForm() {
           <Field label="Plan name" htmlFor="planName">
             <input id="planName" name="planName" value={form.planName ?? ''} onChange={change} className={inputClass} />
           </Field>
-          <Field label="Currency" htmlFor="currencyCode">
-            <input id="currencyCode" name="currencyCode" maxLength={3} value={form.currencyCode ?? ''} onChange={change} className={inputClass} />
-          </Field>
           <Field label="Premium amount" htmlFor="premiumAmount">
             <input id="premiumAmount" name="premiumAmount" required inputMode="decimal" placeholder="12000.00" value={form.premiumAmount} onChange={change} className={inputClass} />
           </Field>

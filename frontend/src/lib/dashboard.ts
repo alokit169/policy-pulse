@@ -2,15 +2,10 @@ import { api } from './api'
 
 export type DashboardScope = 'OWN_BOOK' | 'ORGANIZATION'
 
-/** Totals are per currency and must never be added together. */
-export type CurrencyAmount = {
-  currencyCode: string
-  amount: number
-}
-
+/** Safe to total because every policy is in rupees, enforced by the database. */
 export type Money = {
   count: number
-  amounts: CurrencyAmount[]
+  amount: number
 }
 
 export type ActionItem = {

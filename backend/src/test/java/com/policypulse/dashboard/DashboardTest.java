@@ -107,8 +107,8 @@ class DashboardTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.activeCustomers").value(0))
                 .andExpect(jsonPath("$.activePolicies").value(0))
                 .andExpect(jsonPath("$.overdue.count").value(0))
-                .andExpect(jsonPath("$.overdue.amounts").isEmpty())
-                .andExpect(jsonPath("$.collectedThisMonth.amounts").isEmpty())
+                .andExpect(jsonPath("$.overdue.amount").value(0))
+                .andExpect(jsonPath("$.collectedThisMonth.amount").value(0))
                 .andExpect(jsonPath("$.actionRequired").isEmpty());
     }
 
@@ -128,8 +128,7 @@ class DashboardTest extends AbstractIntegrationTest {
 
         mvc.perform(get("/api/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(agent)))
                 .andExpect(jsonPath("$.overdue.count").value(1))
-                .andExpect(jsonPath("$.overdue.amounts[0].currencyCode").value("INR"))
-                .andExpect(jsonPath("$.overdue.amounts[0].amount").value(1500.00))
+                .andExpect(jsonPath("$.overdue.amount").value(1500.00))
                 .andExpect(jsonPath("$.actionRequired[0].daysOverdue").value(30));
     }
 
@@ -158,7 +157,7 @@ class DashboardTest extends AbstractIntegrationTest {
 
         mvc.perform(get("/api/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(agent)))
                 .andExpect(jsonPath("$.overdue.count").value(2))
-                .andExpect(jsonPath("$.overdue.amounts[0].amount").value(1235.00));
+                .andExpect(jsonPath("$.overdue.amount").value(1235.00));
     }
 
     @Test
@@ -174,7 +173,7 @@ class DashboardTest extends AbstractIntegrationTest {
 
         mvc.perform(get("/api/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(agent)))
                 .andExpect(jsonPath("$.dueNextSevenDays.count").value(2))
-                .andExpect(jsonPath("$.dueNextSevenDays.amounts[0].amount").value(300.00))
+                .andExpect(jsonPath("$.dueNextSevenDays.amount").value(300.00))
                 .andExpect(jsonPath("$.overdue.count").value(0));
     }
 
@@ -193,7 +192,7 @@ class DashboardTest extends AbstractIntegrationTest {
 
         mvc.perform(get("/api/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(agent)))
                 .andExpect(jsonPath("$.collectedThisMonth.count").value(2))
-                .andExpect(jsonPath("$.collectedThisMonth.amounts[0].amount").value(1000.00));
+                .andExpect(jsonPath("$.collectedThisMonth.amount").value(1000.00));
     }
 
     /** An agent's dashboard must not include a colleague's book. */
@@ -212,7 +211,7 @@ class DashboardTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.scope").value("OWN_BOOK"))
                 .andExpect(jsonPath("$.activeCustomers").value(1))
                 .andExpect(jsonPath("$.overdue.count").value(1))
-                .andExpect(jsonPath("$.overdue.amounts[0].amount").value(100.00));
+                .andExpect(jsonPath("$.overdue.amount").value(100.00));
     }
 
     @Test
@@ -232,7 +231,7 @@ class DashboardTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.activeCustomers").value(2))
                 .andExpect(jsonPath("$.activePolicies").value(2))
                 .andExpect(jsonPath("$.overdue.count").value(2))
-                .andExpect(jsonPath("$.overdue.amounts[0].amount").value(1000.00));
+                .andExpect(jsonPath("$.overdue.amount").value(1000.00));
     }
 
     @Test
@@ -285,33 +284,5 @@ class DashboardTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.timezone").value(behind))
                 .andExpect(jsonPath("$.asOf").value(today(behind).toString()))
                 .andExpect(jsonPath("$.overdue.count").value(0));
-    }
-
-    /**
-     * Currency belongs to the policy, so one tenant can hold both. Adding the
-     * totals together would be adding dollars to rupees, so they are reported
-     * separately and only the instalment count is combined.
-     */
-    @Test
-    void moneyFromDifferentCurrenciesIsReportedSeparately() throws Exception {
-        Organization org = tenantOn("UTC");
-        AppUser agent = agentIn(org);
-
-        Policy rupees = policyOf(agent, customerOf(agent));
-        instalment(rupees, today("UTC").minusDays(1), Domain.PremiumStatus.OVERDUE, "1000.00", null);
-
-        Policy dollars = policyOf(agent, customerOf(agent));
-        dollars.setCurrencyCode("USD");
-        policies.save(dollars);
-        instalment(dollars, today("UTC").minusDays(1), Domain.PremiumStatus.OVERDUE, "25.00", null);
-
-        mvc.perform(get("/api/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(agent)))
-                .andExpect(jsonPath("$.overdue.count").value(2))
-                .andExpect(jsonPath("$.overdue.amounts.length()").value(2))
-                // Sorted by code, so the order is stable between loads.
-                .andExpect(jsonPath("$.overdue.amounts[0].currencyCode").value("INR"))
-                .andExpect(jsonPath("$.overdue.amounts[0].amount").value(1000.00))
-                .andExpect(jsonPath("$.overdue.amounts[1].currencyCode").value("USD"))
-                .andExpect(jsonPath("$.overdue.amounts[1].amount").value(25.00));
     }
 }

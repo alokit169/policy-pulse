@@ -293,15 +293,15 @@ class PolicyPremiumTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Regression: the currency default was applied on every save, so updating a
-     * USD policy without repeating the field turned it into an INR one and left
-     * the amounts untouched. The numbers stayed the same while their meaning
-     * changed, which no later read could detect.
+     * Regression: the currency default was applied on every save rather than only
+     * at creation. That no longer changes meaning now the product is rupee-only,
+     * but the bug it guards against, a field being reset by an update that did
+     * not mention it, is worth keeping pinned.
      */
     @Test
     void updatingAPolicyDoesNotResetItsCurrency() throws Exception {
         Map<String, Object> body = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
-        body.put("currencyCode", "USD");
+        body.put("currencyCode", "INR");
         String policyId = create(body).get("id").asText();
 
         Map<String, Object> update = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
@@ -312,13 +312,25 @@ class PolicyPremiumTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(update)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currencyCode").value("USD"));
+                .andExpect(jsonPath("$.currencyCode").value("INR"));
     }
 
+    /**
+     * The product deals in rupees only, so a total across policies is meaningful.
+     * Rejected outright rather than quietly rewritten, so a client is told why.
+     */
     @Test
-    void aNewPolicyDefaultsToRupeesAndTheCurrencyCanStillBeChanged() throws Exception {
-        String policyId = create(policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY")).get("id").asText();
+    void aPolicyInAnyOtherCurrencyIsRejected() throws Exception {
+        Map<String, Object> body = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
+        body.put("currencyCode", "USD");
 
+        mvc.perform(post("/api/policies")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+
+        String policyId = create(policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY")).get("id").asText();
         Map<String, Object> update = policy("2024-01-01", "2026-01-01", "1000.00", "YEARLY");
         update.put("currencyCode", "GBP");
 
@@ -326,8 +338,7 @@ class PolicyPremiumTest extends AbstractIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(update)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currencyCode").value("GBP"));
+                .andExpect(status().isBadRequest());
     }
 
     /**

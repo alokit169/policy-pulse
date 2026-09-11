@@ -20,23 +20,22 @@ import java.util.UUID;
  *
  * <p>Each query has an organization-wide and an agent-scoped form rather than a
  * nullable agent parameter. An untyped null parameter is what broke the customer
- * search the first time it ran, and being explicit costs only a few lines.
+ * search the first time it ran, and being explicit costs only a few lines. The
+ * agent-scoped forms join the policy because that is where the agent is
+ * recorded; the organization-wide ones need no join at all.
  *
  * <p>Buckets are worked out from dates rather than stored status. An instalment's
  * status is written when the schedule is generated and is not rewritten as days
  * pass, so an untouched row can still say UPCOMING after its due date. The date
  * is the truth.
  *
- * <p>Every money total is grouped by currency. Currency belongs to the policy, so
- * one tenant can hold both rupee and dollar policies, and a single sum across
- * them would be adding dollars to rupees.
+ * <p>Summing across policies is only meaningful because every policy is in
+ * rupees, which a check constraint enforces.
  */
 public interface DashboardRepository extends Repository<PremiumPayment, UUID> {
 
-    /** A count and a money total for one currency. */
-    interface CurrencyTotal {
-        String getCurrencyCode();
-
+    /** A count and a money total. */
+    interface MoneySummary {
         long getItemCount();
 
         BigDecimal getTotalAmount();
@@ -62,73 +61,67 @@ public interface DashboardRepository extends Repository<PremiumPayment, UUID> {
     }
 
     @Query("""
-            SELECT pol.currencyCode AS currencyCode, COUNT(p) AS itemCount, SUM(p.amount) AS totalAmount
-            FROM PremiumPayment p JOIN Policy pol ON pol.id = p.policyId
+            SELECT COUNT(p) AS itemCount, COALESCE(SUM(p.amount), 0) AS totalAmount
+            FROM PremiumPayment p
             WHERE p.organizationId = :org
               AND p.status <> com.policypulse.common.Domain$PremiumStatus.PAID
               AND p.status <> com.policypulse.common.Domain$PremiumStatus.WAIVED
               AND p.dueDate < :today
-            GROUP BY pol.currencyCode
             """)
-    List<CurrencyTotal> overdueForOrganization(@Param("org") UUID organizationId, @Param("today") LocalDate today);
+    MoneySummary overdueForOrganization(@Param("org") UUID organizationId, @Param("today") LocalDate today);
 
     @Query("""
-            SELECT pol.currencyCode AS currencyCode, COUNT(p) AS itemCount, SUM(p.amount) AS totalAmount
+            SELECT COUNT(p) AS itemCount, COALESCE(SUM(p.amount), 0) AS totalAmount
             FROM PremiumPayment p JOIN Policy pol ON pol.id = p.policyId
             WHERE p.organizationId = :org AND pol.agentId = :agent
               AND p.status <> com.policypulse.common.Domain$PremiumStatus.PAID
               AND p.status <> com.policypulse.common.Domain$PremiumStatus.WAIVED
               AND p.dueDate < :today
-            GROUP BY pol.currencyCode
             """)
-    List<CurrencyTotal> overdueForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
-                                        @Param("today") LocalDate today);
+    MoneySummary overdueForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
+                                 @Param("today") LocalDate today);
 
     @Query("""
-            SELECT pol.currencyCode AS currencyCode, COUNT(p) AS itemCount, SUM(p.amount) AS totalAmount
-            FROM PremiumPayment p JOIN Policy pol ON pol.id = p.policyId
+            SELECT COUNT(p) AS itemCount, COALESCE(SUM(p.amount), 0) AS totalAmount
+            FROM PremiumPayment p
             WHERE p.organizationId = :org
               AND p.status <> com.policypulse.common.Domain$PremiumStatus.PAID
               AND p.status <> com.policypulse.common.Domain$PremiumStatus.WAIVED
               AND p.dueDate BETWEEN :from AND :to
-            GROUP BY pol.currencyCode
             """)
-    List<CurrencyTotal> dueBetweenForOrganization(@Param("org") UUID organizationId,
-                                                  @Param("from") LocalDate from, @Param("to") LocalDate to);
-
-    @Query("""
-            SELECT pol.currencyCode AS currencyCode, COUNT(p) AS itemCount, SUM(p.amount) AS totalAmount
-            FROM PremiumPayment p JOIN Policy pol ON pol.id = p.policyId
-            WHERE p.organizationId = :org AND pol.agentId = :agent
-              AND p.status <> com.policypulse.common.Domain$PremiumStatus.PAID
-              AND p.status <> com.policypulse.common.Domain$PremiumStatus.WAIVED
-              AND p.dueDate BETWEEN :from AND :to
-            GROUP BY pol.currencyCode
-            """)
-    List<CurrencyTotal> dueBetweenForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
+    MoneySummary dueBetweenForOrganization(@Param("org") UUID organizationId,
                                            @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Query("""
-            SELECT pol.currencyCode AS currencyCode, COUNT(p) AS itemCount, SUM(p.amount) AS totalAmount
+            SELECT COUNT(p) AS itemCount, COALESCE(SUM(p.amount), 0) AS totalAmount
             FROM PremiumPayment p JOIN Policy pol ON pol.id = p.policyId
+            WHERE p.organizationId = :org AND pol.agentId = :agent
+              AND p.status <> com.policypulse.common.Domain$PremiumStatus.PAID
+              AND p.status <> com.policypulse.common.Domain$PremiumStatus.WAIVED
+              AND p.dueDate BETWEEN :from AND :to
+            """)
+    MoneySummary dueBetweenForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
+                                    @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT COUNT(p) AS itemCount, COALESCE(SUM(p.amount), 0) AS totalAmount
+            FROM PremiumPayment p
             WHERE p.organizationId = :org
               AND p.status = com.policypulse.common.Domain$PremiumStatus.PAID
               AND p.paidDate BETWEEN :from AND :to
-            GROUP BY pol.currencyCode
             """)
-    List<CurrencyTotal> collectedForOrganization(@Param("org") UUID organizationId,
-                                                 @Param("from") LocalDate from, @Param("to") LocalDate to);
+    MoneySummary collectedForOrganization(@Param("org") UUID organizationId,
+                                          @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Query("""
-            SELECT pol.currencyCode AS currencyCode, COUNT(p) AS itemCount, SUM(p.amount) AS totalAmount
+            SELECT COUNT(p) AS itemCount, COALESCE(SUM(p.amount), 0) AS totalAmount
             FROM PremiumPayment p JOIN Policy pol ON pol.id = p.policyId
             WHERE p.organizationId = :org AND pol.agentId = :agent
               AND p.status = com.policypulse.common.Domain$PremiumStatus.PAID
               AND p.paidDate BETWEEN :from AND :to
-            GROUP BY pol.currencyCode
             """)
-    List<CurrencyTotal> collectedForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
-                                          @Param("from") LocalDate from, @Param("to") LocalDate to);
+    MoneySummary collectedForAgent(@Param("org") UUID organizationId, @Param("agent") UUID agentId,
+                                   @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Query("""
             SELECT p.id AS premiumId, pol.id AS policyId, c.id AS customerId,

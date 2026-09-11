@@ -38,7 +38,12 @@ public record PolicyRequest(
         @Size(max = 200, message = "Plan name must be at most 200 characters")
         String planName,
 
-        @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be a three-letter code")
+        /**
+         * Rupees only. Kept in the payload and validated rather than silently
+         * ignored, so a client sending anything else is told why. The database
+         * carries the same constraint.
+         */
+        @Pattern(regexp = "^INR$", message = "Only INR is supported")
         String currencyCode,
 
         @DecimalMin(value = "0.00", message = "Sum assured cannot be negative")
