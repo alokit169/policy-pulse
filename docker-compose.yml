@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: insureplatform
+      POSTGRES_USER: insure
+      POSTGRES_PASSWORD: insure
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insure -d insureplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/insureplatform
+      SPRING_DATASOURCE_USERNAME: insure
+      SPRING_DATASOURCE_PASSWORD: insure
+      JWT_SECRET: local-dev-only-change-me-use-32-chars-min!!
+      APP_SEED: "true"
+      AI_PROVIDER: mock
+      VOICE_PROVIDER: mock
+      NOTIFICATION_PROVIDER: mock
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:

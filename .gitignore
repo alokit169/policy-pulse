@@ -1,0 +1,12 @@
+target/
+.idea/
+*.iml
+.vscode/
+node_modules/
+dist/
+.env
+*.log
+backend/.mvn/
+backend/target/
+frontend/dist/
+frontend/node_modules/
