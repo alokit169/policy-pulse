@@ -28,6 +28,55 @@ reason is written to the audit log instead.
 The status check runs *after* the password check, so probing whether an account
 is disabled still requires knowing its password.
 
+## Changing a password
+
+`POST /api/auth/change-password` takes the current password as well as the new
+one. Being signed in is not enough: a token left open on a borrowed laptop must
+not be enough to take an account away from its owner.
+
+It raises the token version, so **every session ends, including the one that made
+the request**. The reason to change a password is usually that somebody else may
+know it, and leaving their session running would defeat the point.
+
+The only rule on the new password is a twelve-character minimum. Composition
+rules push people towards predictable substitutions and away from long
+passphrases, which are the thing worth encouraging.
+
+## Guessing at one account
+
+Ten consecutive wrong passwords lock an account for fifteen minutes. Rate
+limiting is per client IP and does nothing about a slow attack spread across
+addresses at a single account; this bounds the number of guesses that account
+will ever answer.
+
+A locked account answers exactly what an unlocked one with a wrong password
+answers, so being locked is not something the response reveals — that would tell
+an attacker they had found a real account and were close enough to be worth
+locking out. Signing in successfully clears the count.
+
+> The count is written in its own transaction. Login ends by throwing, so a count
+> written inside that transaction would be rolled back with it and the account
+> would never lock at all. The audit log already had to be built the same way.
+
+## Starting up safely
+
+Development is what you opt into, not the other way round. A deployment that sets
+nothing gets the safe behaviour, because forgetting a production flag is exactly
+the mistake worth guarding against and silence is a poor punishment for it.
+
+`StartupChecks` refuses to start when any of these is true, naming all of them
+rather than only the first:
+
+| Refused | Why |
+| --- | --- |
+| `JWT_SECRET` is the key shipped in `application.yml` | It is published here, so anyone can mint a token for any account |
+| `JWT_SECRET` is shorter than 32 characters | Too short to be worth the name for HS256 |
+| `CORS_ORIGINS` contains `*` | Credentials are allowed on these requests |
+| `APP_SEED` is on | It creates accounts on a password published here |
+
+`APP_DEV_MODE=true` turns each into a warning instead, and docker compose sets it
+for local runs. Never set it anywhere else.
+
 ## Revoking access
 
 A JWT cannot be withdrawn once issued, so two checks run on **every** request,
@@ -249,9 +298,8 @@ These are understood and deferred, not overlooked.
 | Gap | Consequence |
 | --- | --- |
 | No refresh tokens | A session lasts exactly one token lifetime, then requires signing in again |
-| No password reset or change | Credentials can only be set by seeding or directly in the database |
-| No per-account lockout | Rate limiting is per IP, so it does not stop a slow distributed guessing attack against one account |
-| Audit log is append-only but unreviewed | Nothing surfaces `LOGIN_FAILURE` patterns yet |
+| No password reset | A password can be changed by somebody who knows it, but somebody who has forgotten theirs still needs an administrator with database access |
+| Audit log is append-only but unreviewed | A locked account is now the visible signal, but nothing surfaces `LOGIN_FAILURE` patterns before that point |
 | No MFA | Single factor only |
 | No real telephony provider | Calls are simulated; a live provider needs webhook signature checks and replay safety before it is wired in |
 | No real email or SMS provider | Messages are simulated. A live one needs the same webhook safety, plus bounce handling and unsubscribe, before it is wired in |

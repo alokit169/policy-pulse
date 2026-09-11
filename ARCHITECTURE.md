@@ -110,4 +110,14 @@ docs via README, LOCAL_DEVELOPMENT, DATABASE, SECURITY
 
 ## Implementation roadmap
 
-Phases 1–12 as in the product plan: setup → auth/audit → customers → policies/premiums → reminders + in-app notify → dashboard → conversations/follow-ups → AI → voice → follow-up engine → email/SMS providers → seed/hardening.
+Phases 1–12 as in the product plan, all of them now built: setup → auth/audit →
+customers → policies/premiums → reminders + in-app notify → dashboard →
+conversations/follow-ups → AI → voice → follow-up engine → email/SMS providers →
+seed/hardening.
+
+Each phase was followed by a review that looked for defects rather than for
+agreement, and the fixes were committed separately. The ones worth knowing about
+are recorded where the code that fixed them lives: three separate places where a
+decision was read a moment before it was written, a queue that could starve, an
+email subject that could carry a header, and a message that named the wrong date
+about somebody's money.

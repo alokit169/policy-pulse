@@ -35,6 +35,13 @@ public class AuthController {
         authService.revokeAllSessions();
     }
 
+    @PostMapping("/change-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Change your own password, which signs you out everywhere")
+    public void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+    }
+
     @GetMapping("/me")
     @Operation(summary = "The user the presented token belongs to")
     public UserSummary me() {

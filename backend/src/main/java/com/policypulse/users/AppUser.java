@@ -23,6 +23,10 @@ public class AppUser {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant lastLoginAt;
+    /** Consecutive failures since the last success. Reset by signing in. */
+    private int failedLoginAttempts;
+    /** While this is in the future the account answers nothing. Null when it is not locked. */
+    private Instant lockedUntil;
 
     /**
      * Raised to invalidate every token already issued to this user. Tokens carry
@@ -64,6 +68,10 @@ public class AppUser {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public int getFailedLoginAttempts() { return failedLoginAttempts; }
+    public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+    public Instant getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(Instant lockedUntil) { this.lockedUntil = lockedUntil; }
     public Instant getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
     public int getTokenVersion() { return tokenVersion; }

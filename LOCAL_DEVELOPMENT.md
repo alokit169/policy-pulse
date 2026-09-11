@@ -111,12 +111,46 @@ development, so the app runs without any `.env` present.
 | `JWT_SECRET` | dev placeholder | HMAC key, min 32 chars |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:80` | Allowed origins |
 | `RATE_LIMIT_RPM` | `120` | Requests per minute per client |
-| `APP_SEED` | `false` | Seed demo data on boot |
+| `APP_SEED` | `false` | Seed the demo agency on first boot |
+| `APP_DEV_MODE` | `false` | Turns the startup safety checks into warnings. Needed to run with the placeholder key or with seeding on |
 | `AI_PROVIDER` | `mock` | AI backend |
 | `VOICE_PROVIDER` | `mock` | Voice backend. Only `mock` is implemented; `twilio` fails at startup on purpose |
 | `NOTIFICATION_PROVIDER` | `mock` | Email and SMS backend. Only `mock` is implemented; `real` fails at startup on purpose |
 
 Never commit a real `JWT_SECRET`. `.env` is gitignored.
+
+`APP_DEV_MODE` is the one to understand. The application refuses to start on the
+shipped signing key, a wildcard CORS origin, or demo seeding, because a
+deployment that sets nothing should get the safe behaviour rather than a silent
+unsafe one. Saying `APP_DEV_MODE=true` turns each into a warning; docker compose
+sets it, and `.env.example` has it. Anywhere else, set a real `JWT_SECRET`
+instead.
+
+## The demo agency
+
+`APP_SEED=true` creates *Demo Insurance Agency*, an Indian tenant so the demo
+exercises a timezone whose day rolls over before the server's. Three accounts,
+all on `Password123!`:
+
+| Account | Role | Sees |
+| --- | --- | --- |
+| `admin@demo.local` | Organization admin | The whole agency |
+| `agent@demo.local` | Agent | Their own customers only |
+| `agent2@demo.local` | Agent | Theirs, which is how the split is visible |
+
+Eight customers, chosen for coverage rather than volume: two up to date, two with
+this month outstanding, four a month behind on staggered dates, and one of those
+four opted out — so detection can be seen skipping somebody. Every address is
+`@example.test`, which cannot be delivered to.
+
+There is also a call that was answered, the promise made on it, and a claimed
+payment. The promise is for a day that has passed, so the first run of the
+follow-up engine escalates it; the claimed payment sits flagged for a person,
+never recorded as received. The two are on different customers on purpose: on one
+person they cancel out, correctly, and neither would be visible.
+
+Seeding is idempotent — it stops the moment it finds the admin account — so
+restarting never duplicates anything. To start over: `docker compose down -v`.
 
 ## Database schema
 
@@ -166,6 +200,10 @@ performs. Docker must be running.
 | `MessagingTest` | Which channel may be used when, unusable addresses, retries, and what is recorded |
 | `MockMessageProviderTest` | The mock outcomes are the same every time, and addresses stay out of logs |
 | `MessageContentTest` | A message names the instalment it is about, and nothing typed can reshape it |
+| `LoginLockoutTest` | An account stops answering after enough wrong guesses, and does not say so |
+| `PasswordChangeTest` | Changing a password needs the old one and ends every session |
+| `StartupChecksTest` | An unsafe configuration refuses to start unless the machine says it is a development one |
+| `DemoBookTest` | The demo data says what it claims: who is behind, who opted out, what is owed |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 

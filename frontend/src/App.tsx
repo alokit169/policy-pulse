@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard'
 import FollowUps from './pages/FollowUps'
 import Policies from './pages/Policies'
 import Tasks from './pages/Tasks'
+import Settings from './pages/Settings'
 import PolicyForm from './pages/PolicyForm'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
@@ -101,9 +102,13 @@ function AuthenticatedLayout() {
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <NotificationBell />
-            <span className="text-slate-500">
+            <Link
+              to="/settings"
+              className="text-slate-500 hover:text-slate-900 hover:underline"
+              title="Settings"
+            >
               {user?.name} · {user?.role.replace(/_/g, ' ').toLowerCase()}
-            </span>
+            </Link>
             <button
               type="button"
               onClick={logout}
@@ -150,6 +155,7 @@ export default function App() {
           <Route path="/conversations/:id" element={<ConversationDetail />} />
           <Route path="/follow-ups" element={<FollowUps />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>

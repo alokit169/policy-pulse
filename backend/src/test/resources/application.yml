@@ -22,6 +22,9 @@ spring:
     default-property-inclusion: non_null
 
 app:
+  # Tests run on the shipped signing key and a wildcard-free CORS list, which
+  # StartupChecks would otherwise refuse to start on.
+  dev-mode: true
   seed: false
   # Tests drive detection explicitly; a background sweep would race their
   # assertions about how many reminders exist.

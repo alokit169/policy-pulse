@@ -13,10 +13,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
- * Minimal demo tenant so the app is usable immediately. Enabled by app.seed,
- * which docker-compose sets for local runs. Idempotent: restarting never
- * duplicates or overwrites. Richer sample data belongs to the seeding phase.
+ * A demo tenant so the app is usable immediately: an agency, the people who work
+ * there, and — through DemoBook — a book of business with something on every
+ * page.
+ *
+ * <p>Enabled by app.seed, which docker compose sets for local runs. Idempotent:
+ * restarting never duplicates or overwrites, because it stops the moment it finds
+ * the admin account already there.
+ *
+ * <p>StartupChecks refuses to start with this on unless the machine has said it
+ * is a development one. The accounts below share a password published in this
+ * repository.
  */
 @Component
 @ConditionalOnProperty(name = "app.seed", havingValue = "true")
@@ -26,16 +36,20 @@ public class DevSeeder implements CommandLineRunner {
     private static final String ORG_NAME = "Demo Insurance Agency";
     private static final String ADMIN_EMAIL = "admin@demo.local";
     private static final String AGENT_EMAIL = "agent@demo.local";
+    private static final String SECOND_AGENT_EMAIL = "agent2@demo.local";
     private static final String DEMO_PASSWORD = "Password123!";
 
     private final OrganizationRepository organizations;
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final DemoBook book;
 
-    public DevSeeder(OrganizationRepository organizations, UserRepository users, PasswordEncoder passwordEncoder) {
+    public DevSeeder(OrganizationRepository organizations, UserRepository users,
+                     PasswordEncoder passwordEncoder, DemoBook book) {
         this.organizations = organizations;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.book = book;
     }
 
     @Override
@@ -49,6 +63,9 @@ public class DevSeeder implements CommandLineRunner {
         Organization org = new Organization();
         org.setName(ORG_NAME);
         org.setEmail("contact@demo.local");
+        // An Indian agency, so the demo exercises a tenant whose day rolls over
+        // five and a half hours before the server's.
+        org.setTimezone("Asia/Kolkata");
         org.setStatus(Domain.EntityStatus.ACTIVE);
         organizations.save(org);
 
@@ -59,7 +76,16 @@ public class DevSeeder implements CommandLineRunner {
         agent.setManagerId(admin.getId());
         users.save(agent);
 
-        log.info("Seeded organization '{}' with users {} and {}", ORG_NAME, ADMIN_EMAIL, AGENT_EMAIL);
+        // A second agent, so "an agent sees only their own book" is something a
+        // demo can actually show rather than assert.
+        AppUser second = user(org, "Demo Agent Two", SECOND_AGENT_EMAIL, Domain.Role.AGENT);
+        second.setManagerId(admin.getId());
+        users.save(second);
+
+        book.fill(org, List.of(agent, second));
+
+        log.info("Seeded organization '{}' with users {}, {} and {}",
+                ORG_NAME, ADMIN_EMAIL, AGENT_EMAIL, SECOND_AGENT_EMAIL);
         log.warn("Demo accounts use a well-known password. Never enable app.seed outside development.");
     }
 

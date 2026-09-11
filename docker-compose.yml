@@ -25,6 +25,9 @@ services:
       SPRING_DATASOURCE_USERNAME: policypulse
       SPRING_DATASOURCE_PASSWORD: policypulse
       JWT_SECRET: local-dev-only-change-me-use-32-chars-min!!
+      # A local stack: the shipped signing key and demo accounts are fine here,
+      # and StartupChecks refuses to start without this being said out loud.
+      APP_DEV_MODE: "true"
       APP_SEED: "true"
       AI_PROVIDER: mock
       VOICE_PROVIDER: mock

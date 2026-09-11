@@ -472,22 +472,36 @@ jobs:
                                         -H "$AUTH" -H "$JSON" \
                                         -d "{\"customerId\":\"$CALLBACK_CUSTOMER\",\"reason\":\"CALLBACK_REQUESTED\"}"
 
+          CALLBACK_FU=$(curl -s -H "$AUTH" 'http://localhost:5173/api/follow-ups?size=50' \
+                        | sed 's/},{/}\n{/g' \
+                        | grep '"reason":"CALLBACK_REQUESTED"' \
+                        | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+
           UNREAD_BEFORE=$(curl -s -H "$AUTH" http://localhost:5173/api/notifications/unread-count \
                           | sed -n 's/.*"unread":\([0-9]*\).*/\1/p')
 
           RUN=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run)
           if echo "$RUN" | grep -q '"broughtDue":0'; then
-            echo "FAIL  a follow-up whose moment had arrived did not come due: $RUN"
+            echo "FAIL  nothing came due, though something was waiting: $RUN"
             failed=1
           else
             echo "ok    a follow-up whose moment had arrived came due"
           fi
 
-          # Only a payment commitment can be broken, and this is not one.
-          if echo "$RUN" | grep -q '"escalated":0'; then
-            echo "ok    a callback request was never called a broken promise"
+          # Only a payment commitment can be broken, and this is not one. Asked of
+          # this follow-up rather than of the run's totals, because the demo book
+          # seeds a promise that genuinely is broken and escalates on the same run.
+          CALLBACK_STATE=$(curl -s -H "$AUTH" "http://localhost:5173/api/follow-ups/$CALLBACK_FU")
+          if echo "$CALLBACK_STATE" | grep -q '"escalatedAt"'; then
+            echo "FAIL  a callback request was escalated: $CALLBACK_STATE"
+            failed=1
           else
-            echo "FAIL  a callback request was escalated: $RUN"
+            echo "ok    a callback request was never called a broken promise"
+          fi
+          if echo "$CALLBACK_STATE" | grep -q '"status":"DUE"'; then
+            echo "ok    the callback request came due"
+          else
+            echo "FAIL  the callback request did not come due: $CALLBACK_STATE"
             failed=1
           fi
 
@@ -508,6 +522,53 @@ jobs:
             echo "FAIL  unread went from $UNREAD_BEFORE to $UNREAD_AFTER across two runs"
             failed=1
           fi
+
+          # The demo book. What somebody sees first has to be there, and has to
+          # cover the states the app exists to show.
+          DEMO=$(curl -s -H "$ADMIN_AUTH" 'http://localhost:5173/api/customers?size=50')
+          for who in Meera Anita Priya Sunita Kabir; do
+            if echo "$DEMO" | grep -q "\"firstName\":\"$who\""; then
+              echo "ok    the demo book has $who in it"
+            else
+              echo "FAIL  the demo book is missing $who"
+              failed=1
+            fi
+          done
+
+          # Nothing in a demo may be deliverable to a real person.
+          if echo "$DEMO" | grep -o '"email":"[^"]*"' | grep -v '@example.test"' | grep -q .; then
+            echo "FAIL  a demo customer has an address that could be written to"
+            echo "$DEMO" | grep -o '"email":"[^"]*"' | grep -v '@example.test"' | head -3
+            failed=1
+          else
+            echo "ok    no demo customer could be written to"
+          fi
+
+          # Changing a password, which until now could only be done in the
+          # database. It signs every device out, so the token used here dies with
+          # it — which is the half worth checking.
+          PW_TOKEN=$(curl -s -X POST http://localhost:5173/api/auth/login \
+                       -H "$JSON" \
+                       -d '{"email":"agent2@demo.local","password":"Password123!"}' \
+                     | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          PW_AUTH="Authorization: Bearer $PW_TOKEN"
+
+          check "wrong current password" 403 -X POST http://localhost:5173/api/auth/change-password \
+                                        -H "$PW_AUTH" -H "$JSON" \
+                                        -d '{"currentPassword":"not-it","newPassword":"a-much-longer-passphrase"}'
+          check "a short new password"   400 -X POST http://localhost:5173/api/auth/change-password \
+                                        -H "$PW_AUTH" -H "$JSON" \
+                                        -d '{"currentPassword":"Password123!","newPassword":"short"}'
+          check "change the password"    204 -X POST http://localhost:5173/api/auth/change-password \
+                                        -H "$PW_AUTH" -H "$JSON" \
+                                        -d '{"currentPassword":"Password123!","newPassword":"a-much-longer-passphrase"}'
+          check "the old token is dead"  401 -H "$PW_AUTH" http://localhost:5173/api/auth/me
+          check "the old password is dead" 401 -X POST http://localhost:5173/api/auth/login \
+                                        -H "$JSON" \
+                                        -d '{"email":"agent2@demo.local","password":"Password123!"}'
+          check "the new password works" 200 -X POST http://localhost:5173/api/auth/login \
+                                        -H "$JSON" \
+                                        -d '{"email":"agent2@demo.local","password":"a-much-longer-passphrase"}'
 
           exit $failed
 

@@ -33,6 +33,10 @@ management:
         include: health,info
 
 app:
+  # Development is what you opt into, so a deployment that sets nothing gets
+  # the safe behaviour. StartupChecks says what this turns from an error into
+  # a warning.
+  dev-mode: ${APP_DEV_MODE:false}
   seed: ${APP_SEED:false}
   # Decides what "today" means for premium due dates.
   timezone: ${APP_TIMEZONE:UTC}
