@@ -35,6 +35,11 @@ public class JwtService {
                 .compact();
     }
 
+    /** Lets callers tell the client when the token it just received will expire. */
+    public long getExpirationMs() {
+        return expirationMs;
+    }
+
     public Claims parse(String token) {
         return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
     }

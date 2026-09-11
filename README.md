@@ -16,7 +16,15 @@ docker compose up --build
 - API: http://localhost:8080
 - Swagger: http://localhost:8080/swagger-ui.html
 
-**Demo login** (after seed): `agent@demo.local` / `Password123!`
+**Demo login** (seeded when `APP_SEED=true`, which docker compose sets):
+
+| Account | Email | Password | Role |
+| --- | --- | --- | --- |
+| Agent | `agent@demo.local` | `Password123!` | AGENT |
+| Admin | `admin@demo.local` | `Password123!` | ORGANIZATION_ADMIN |
+
+Sign in at http://localhost:5173. The API issues a bearer token from
+`POST /api/auth/login`; `GET /api/auth/me` returns the token holder.
 
 ## Docs
 

@@ -97,8 +97,16 @@ performs. Docker must be running.
 | Test | Guards |
 | --- | --- |
 | `SchemaIntegrityTest` | Entities match the migrations; every migration applied |
-| `ErrorHandlingTest` | Unmatched routes return 404, protected routes 403, health and API docs public |
+| `ErrorHandlingTest` | Unmatched routes return 404, anonymous requests 401, health and API docs public |
+| `AuthIntegrationTest` | Login, token issue, enumeration resistance, live revocation, audit |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
+
+### Status codes
+
+`401` means no credentials were supplied or they were rejected, so the client
+should sign in. `403` means the caller is authenticated but not permitted. Spring
+returns `403` for anonymous requests by default; `SecurityConfig` overrides that
+so a SPA can tell the two apart.
 
 CI runs the same suite plus the frontend build and a smoke test of the full
 Docker stack. See `.github/workflows/ci.yml`.
