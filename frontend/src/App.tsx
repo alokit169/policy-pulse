@@ -1,6 +1,10 @@
-import { NavLink, Outlet, Route, Routes } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import RequireAuth from './components/RequireAuth'
 import { useAuth } from './lib/auth'
+import { unreadCount } from './lib/notifications'
+import Notifications from './pages/Notifications'
+import Reminders from './pages/Reminders'
 import CustomerForm from './pages/CustomerForm'
 import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
@@ -15,7 +19,54 @@ const NAV = [
   { to: '/', label: 'Dashboard' },
   { to: '/customers', label: 'Customers' },
   { to: '/policies', label: 'Policies' },
+  { to: '/reminders', label: 'Reminders' },
 ]
+
+/**
+ * Unread count in the header. Refreshed on navigation and on a slow timer:
+ * reminders are raised by a background job, so the number can change without
+ * the user doing anything.
+ */
+function NotificationBell() {
+  const [unread, setUnread] = useState(0)
+  const location = useLocation()
+
+  useEffect(() => {
+    let cancelled = false
+
+    const refresh = () => {
+      unreadCount()
+        .then((count) => {
+          if (!cancelled) setUnread(count)
+        })
+        .catch(() => {
+          // A failed count is not worth interrupting the page for.
+        })
+    }
+
+    refresh()
+    const timer = setInterval(refresh, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [location.pathname])
+
+  return (
+    <Link
+      to="/notifications"
+      className="relative rounded-md border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-100"
+      aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+    >
+      Alerts
+      {unread > 0 && (
+        <span className="ml-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-xs font-medium text-white">
+          {unread > 99 ? '99+' : unread}
+        </span>
+      )}
+    </Link>
+  )
+}
 
 function AuthenticatedLayout() {
   const { user, logout, logoutEverywhere } = useAuth()
@@ -42,6 +93,7 @@ function AuthenticatedLayout() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <NotificationBell />
             <span className="text-slate-500">
               {user?.name} · {user?.role.replace(/_/g, ' ').toLowerCase()}
             </span>
@@ -85,6 +137,8 @@ export default function App() {
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/new" element={<PolicyForm />} />
           <Route path="/policies/:id" element={<PolicyForm />} />
+          <Route path="/reminders" element={<Reminders />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>

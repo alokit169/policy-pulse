@@ -14,6 +14,7 @@ Migrations live in `backend/src/main/resources/db/migration` and are named
 | `V3__token_revocation` | `users.token_version` |
 | `V4__premium_schedule` | Unique instalment per policy and due date |
 | `V5__premium_optimistic_locking` | `premium_payments.version` |
+| `V6__reminder_queries` | Indexes for reminder listing, detection and unread counts |
 
 ### Rules
 
@@ -81,10 +82,21 @@ policies and premium history reference them.
 
 | Table | Notes |
 | --- | --- |
-| `reminders` | Detected work, scheduled per configuration |
+| `reminders` | Detected work, scheduled per configuration. Unique `idempotency_key` |
 | `conversations`, `conversation_messages` | Calls and transcripts |
 | `follow_ups`, `human_tasks` | Commitments and work requiring a person |
 | `in_app_notifications` | Delivered in the UI |
+
+Reminder detection runs on a timer, so it will be run again over the same data.
+Each reminder carries an `idempotency_key` built from what it is about, not when
+it was made: the reminder type, the policy, the instalment's due date and the
+configured offset. The column is unique, so a repeated run, an overlapping run
+or a retry after a crash all converge on the same set of reminders rather than
+raising duplicates.
+
+Dates are read in each organization's own timezone, taken from
+`organizations.timezone`. Reading them in UTC would chase the wrong day's
+premiums for part of every day for any tenant not on UTC.
 
 ### Audit
 

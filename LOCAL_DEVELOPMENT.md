@@ -149,8 +149,19 @@ performs. Docker must be running.
 | `PolicyPremiumTest` | Schedule generation, payment, waiving, money scale |
 | `PremiumScheduleTest` | Due-date arithmetic, including month-end and leap years |
 | `PremiumConcurrencyTest` | Simultaneous payments settle an instalment exactly once |
+| `ReminderDetectionTest` | Detection is repeatable, honours consent and reads each tenant's own date |
+| `ReminderOffsetsTest` | Parsing the configured day offsets |
+| `ReminderApiTest` | Settings permissions, validation, notification ownership |
+| `FixedClockTest` | The suite really is running against a frozen clock |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
 | `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
+
+### Time in tests
+
+The suite runs against a clock frozen at a fixed instant, so anything that
+depends on "today" is deterministic. `FixedClockTest` exists because the
+override silently did not apply at first, and every date-sensitive test was
+quietly running against the real date instead.
 
 ### Status codes
 

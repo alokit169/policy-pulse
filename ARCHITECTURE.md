@@ -30,8 +30,8 @@ flowchart LR
 | `customers` | Customer CRM, scoped to the caller's tenant |
 | `policies` | Policies, scoped to the caller's tenant |
 | `premiums` | Instalment schedules and recorded payments |
-| `reminders` | Reminder entities and detection |
-| `notifications` | In-app + provider abstraction |
+| `reminders` | Reminder entities, idempotent detection and per-tenant settings |
+| `notifications` | In-app messages per user + provider abstraction |
 | `ai` | AIProvider, intent, context, validation |
 | `voice` | VoiceProvider, mock/Twilio stub |
 | `conversations` | Calls, transcripts, messages |
@@ -39,7 +39,7 @@ flowchart LR
 | `dashboard` | Aggregates and action-required |
 | `audit` | Audit log writer |
 | `reports` | CSV/report queries |
-| `scheduler` | Idempotent jobs |
+| `scheduler` | Hourly sweep, so each tenant is picked up after its own midnight |
 | `common` | Errors, DTOs, pagination |
 | `security` | JWT filter, RBAC helpers |
 

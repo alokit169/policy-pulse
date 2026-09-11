@@ -182,6 +182,30 @@ jobs:
             failed=1
           fi
 
+          # Reminders and notifications.
+          check "reminder config"   200 -H "$AUTH" http://localhost:5173/api/reminders/configuration
+          check "reminder list"     200 -H "$AUTH" http://localhost:5173/api/reminders
+          check "notifications"     200 -H "$AUTH" http://localhost:5173/api/notifications
+          check "unread count"      200 -H "$AUTH" http://localhost:5173/api/notifications/unread-count
+          check "agent may not run detection" 403 -X POST -H "$AUTH" http://localhost:5173/api/reminders/detect
+
+          ADMIN=$(curl -s -X POST http://localhost:5173/api/auth/login \
+                    -H "$JSON" \
+                    -d '{"email":"admin@demo.local","password":"Password123!"}' \
+                  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          ADMIN_AUTH="Authorization: Bearer $ADMIN"
+          check "manager may run detection" 200 -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect
+
+          # Detection runs on a timer, so running it again must raise nothing new.
+          FIRST=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect)
+          SECOND=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/detect)
+          if echo "$FIRST" | grep -q '"created":0' && echo "$SECOND" | grep -q '"created":0'; then
+            echo "ok    detection is repeatable (raised nothing new)"
+          else
+            echo "FAIL  detection raised new reminders on a repeat run: $FIRST then $SECOND"
+            failed=1
+          fi
+
           exit $failed
 
       - name: Dump logs on failure

@@ -18,5 +18,9 @@ public interface PremiumPaymentRepository extends JpaRepository<PremiumPayment, 
     long countByOrganizationIdAndStatus(UUID orgId, Domain.PremiumStatus status);
     long countByOrganizationIdAndStatusAndDueDateBetween(UUID orgId, Domain.PremiumStatus status, LocalDate from, LocalDate to);
     Optional<PremiumPayment> findByIdAndOrganizationId(UUID id, UUID orgId);
+
+    /** Reminder detection: one tenant's instalments falling due on one date. */
+    List<PremiumPayment> findByOrganizationIdAndDueDateAndStatusIn(
+            UUID organizationId, LocalDate dueDate, java.util.Collection<Domain.PremiumStatus> statuses);
     List<PremiumPayment> findByOrganizationIdAndVerificationPendingTrue(UUID orgId);
 }

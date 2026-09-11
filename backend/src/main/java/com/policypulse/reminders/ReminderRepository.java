@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface ReminderRepository extends JpaRepository<Reminder, UUID> {
     boolean existsByIdempotencyKey(String key);
     Page<Reminder> findByOrganizationId(UUID orgId, Pageable pageable);
+    Page<Reminder> findByOrganizationIdAndStatus(UUID orgId, Domain.ReminderStatus status, Pageable pageable);
     List<Reminder> findByStatusAndScheduledAtBefore(Domain.ReminderStatus status, Instant when);
     List<Reminder> findByStatusAndNextAttemptAtBefore(Domain.ReminderStatus status, Instant when);
     List<Reminder> findByCustomerIdOrderByScheduledAtDesc(UUID customerId);

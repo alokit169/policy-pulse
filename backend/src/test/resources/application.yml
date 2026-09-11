@@ -5,6 +5,9 @@
 # what makes entity/schema drift fail the build the same way it fails a
 # production boot. Using H2 with create-drop would hide exactly that class of bug.
 spring:
+  # FixedClockConfiguration replaces the application's clock bean by name.
+  main:
+    allow-bean-definition-overriding: true
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,6 +23,10 @@ spring:
 
 app:
   seed: false
+  # Tests drive detection explicitly; a background sweep would race their
+  # assertions about how many reminders exist.
+  reminders:
+    scheduler-enabled: false
   jwt:
     secret: test-secret-test-secret-test-secret-32
     expiration-ms: 86400000
