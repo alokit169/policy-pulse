@@ -240,4 +240,38 @@ class CustomerCrudTest extends AbstractIntegrationTest {
         assertThat(entries).allSatisfy(entry ->
                 assertThat(entry.getOrganizationId()).isEqualTo(agent.getOrganizationId()));
     }
+
+    /**
+     * A search term is user input, so LIKE metacharacters in it must match
+     * literally. Without escaping, searching for "%" returned every customer.
+     */
+    @Test
+    void likeWildcardsInASearchTermAreMatchedLiterally() throws Exception {
+        create(payload("Asha", "Verma"));
+        create(payload("Ravi", "Kumar"));
+
+        mvc.perform(get("/api/customers").param("q", "%")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+
+        mvc.perform(get("/api/customers").param("q", "_")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath("$.total").value(0));
+
+        // The escape character itself is not special to the caller either.
+        mvc.perform(get("/api/customers").param("q", "!")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath("$.total").value(0));
+    }
+
+    @Test
+    void aLiteralPercentInANameIsFound() throws Exception {
+        create(payload("Disc%unt", "Shop"));
+
+        mvc.perform(get("/api/customers").param("q", "disc%unt")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].firstName").value("Disc%unt"));
+    }
 }

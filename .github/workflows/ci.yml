@@ -126,16 +126,21 @@ jobs:
           fi
           AUTH="Authorization: Bearer $TOKEN"
 
+          # Phone is unique per tenant, so a fixed number would make this script
+          # pass only against an empty database.
+          PHONE="+91$(date +%s | tail -c 10)"
+
           check "customer list"     200 -H "$AUTH" http://localhost:5173/api/customers
           check "customer create"   201 -X POST http://localhost:5173/api/customers \
                                         -H "$AUTH" -H "$JSON" \
-                                        -d '{"firstName":"Smoke","lastName":"Test","phone":"+919000000001"}'
+                                        -d "{\"firstName\":\"Smoke\",\"lastName\":\"Test\",\"phone\":\"$PHONE\"}"
           check "duplicate phone"   409 -X POST http://localhost:5173/api/customers \
                                         -H "$AUTH" -H "$JSON" \
-                                        -d '{"firstName":"Smoke","lastName":"Again","phone":"+919000000001"}'
+                                        -d "{\"firstName\":\"Smoke\",\"lastName\":\"Again\",\"phone\":\"$PHONE\"}"
           check "invalid customer"  400 -X POST http://localhost:5173/api/customers \
                                         -H "$AUTH" -H "$JSON" \
-                                        -d '{"firstName":"","lastName":"Test","phone":"+919000000002"}'
+                                        -d "{\"firstName\":\"\",\"lastName\":\"Test\",\"phone\":\"$PHONE\"}"
+          check "wildcard search"   200 -H "$AUTH" 'http://localhost:5173/api/customers?q=%25'
           check "unknown customer"  404 -H "$AUTH" \
                                         http://localhost:5173/api/customers/00000000-0000-0000-0000-000000000000
 

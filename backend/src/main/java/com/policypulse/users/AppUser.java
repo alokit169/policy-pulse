@@ -24,6 +24,12 @@ public class AppUser {
     private Instant updatedAt;
     private Instant lastLoginAt;
 
+    /**
+     * Raised to invalidate every token already issued to this user. Tokens carry
+     * the value they were minted with and are rejected once it falls behind.
+     */
+    private int tokenVersion;
+
     @PrePersist
     void pre() {
         if (id == null) id = UUID.randomUUID();
@@ -60,4 +66,8 @@ public class AppUser {
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
     public Instant getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
+    public int getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(int tokenVersion) { this.tokenVersion = tokenVersion; }
+    /** Invalidates every token already issued to this user. */
+    public void revokeIssuedTokens() { this.tokenVersion++; }
 }

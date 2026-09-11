@@ -24,16 +24,18 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
      * "function lower(bytea) does not exist".
      *
      * <p>firstName is NOT NULL, so an unfiltered search still matches every row.
+     * The caller escapes LIKE metacharacters in the search term, so a customer
+     * searching for a literal "%" does not match everything.
      */
     @Query("""
             SELECT c FROM Customer c WHERE c.organizationId = :org
             AND (:agentId IS NULL OR c.assignedAgentId = :agentId)
             AND (:status IS NULL OR c.status = :status)
-            AND (LOWER(c.firstName) LIKE :pattern
-                 OR LOWER(c.lastName) LIKE :pattern
-                 OR LOWER(c.phone) LIKE :pattern
-                 OR LOWER(c.email) LIKE :pattern
-                 OR LOWER(c.customerNumber) LIKE :pattern)
+            AND (LOWER(c.firstName) LIKE :pattern ESCAPE '!'
+                 OR LOWER(c.lastName) LIKE :pattern ESCAPE '!'
+                 OR LOWER(c.phone) LIKE :pattern ESCAPE '!'
+                 OR LOWER(c.email) LIKE :pattern ESCAPE '!'
+                 OR LOWER(c.customerNumber) LIKE :pattern ESCAPE '!')
             """)
     Page<Customer> search(@Param("org") UUID org, @Param("agentId") UUID agentId,
                           @Param("status") Domain.EntityStatus status,

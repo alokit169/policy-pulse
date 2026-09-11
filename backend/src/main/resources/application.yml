@@ -36,7 +36,10 @@ app:
   seed: ${APP_SEED:false}
   jwt:
     secret: ${JWT_SECRET:local-dev-only-change-me-use-32-chars-min!!}
-    expiration-ms: 86400000
+    # 8 hours. There is no refresh token, so this is the whole session length.
+    # Raising it widens the window in which a stolen token is usable; the token
+    # version is what revokes one before it expires.
+    expiration-ms: ${JWT_EXPIRATION_MS:28800000}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:80}
   rate-limit:

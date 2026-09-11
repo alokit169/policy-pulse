@@ -28,11 +28,13 @@ Sign in at http://localhost:5173. The API issues a bearer token from
 
 ## Docs
 
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md)
-- [DATABASE.md](DATABASE.md)
-- [API.md](API.md)
-- [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md)
-- [VOICE_ARCHITECTURE.md](VOICE_ARCHITECTURE.md)
-- [SECURITY.md](SECURITY.md)
-- [DEPLOYMENT.md](DEPLOYMENT.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — modules, flows and the phase roadmap
+- [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) — running it, VS Code, tests
+- [DATABASE.md](DATABASE.md) — schema, migrations and multi-tenancy
+- [SECURITY.md](SECURITY.md) — auth model, isolation rules and known gaps
+
+The live API reference is Swagger UI at
+http://localhost:8080/swagger-ui.html once the stack is running.
+
+Planned, arriving with the phases that introduce them: `AI_ARCHITECTURE.md`,
+`VOICE_ARCHITECTURE.md`, `DEPLOYMENT.md`.

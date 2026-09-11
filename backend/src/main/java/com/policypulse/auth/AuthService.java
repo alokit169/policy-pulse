@@ -5,6 +5,7 @@ import com.policypulse.audit.AuditService;
 import com.policypulse.common.ApiException;
 import com.policypulse.common.Domain;
 import com.policypulse.security.JwtService;
+import com.policypulse.security.SecurityUtil;
 import com.policypulse.users.AppUser;
 import com.policypulse.users.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -76,12 +77,30 @@ public class AuthService {
         auditService.record(AuditAction.LOGIN_SUCCESS, ENTITY, user.getId().toString(),
                 user.getOrganizationId(), user.getId(), user.getEmail(), null);
 
-        String token = jwtService.issue(user.getId(), user.getEmail(), user.getRole().name());
+        String token = jwtService.issue(
+                user.getId(), user.getEmail(), user.getRole().name(), user.getTokenVersion());
         Instant expiresAt = Instant.now().plusMillis(jwtService.getExpirationMs());
         return new LoginResponse(token, expiresAt, UserSummary.of(user));
     }
 
     /** Records the attempt and returns the exception for the caller to throw. */
+    /**
+     * Raises the user's token version, so every token already issued to them
+     * stops working. Used for signing out of all devices, and the mechanism a
+     * password change will reuse.
+     */
+    @Transactional
+    public void revokeAllSessions() {
+        AppUser user = SecurityUtil.currentUser();
+        AppUser managed = userRepository.findById(user.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Not authenticated"));
+        managed.revokeIssuedTokens();
+        userRepository.save(managed);
+
+        auditService.record(AuditAction.SESSIONS_REVOKED, ENTITY, managed.getId().toString(),
+                managed.getOrganizationId(), managed.getId(), managed.getEmail(), null);
+    }
+
     private ApiException failedLogin(UUID organizationId, UUID actorId, String email, String reason) {
         auditService.record(AuditAction.LOGIN_FAILURE, ENTITY,
                 actorId == null ? null : actorId.toString(), organizationId, actorId, email, reason);

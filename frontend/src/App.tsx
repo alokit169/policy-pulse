@@ -15,7 +15,7 @@ const NAV = [
 ]
 
 function AuthenticatedLayout() {
-  const { user, logout } = useAuth()
+  const { user, logout, logoutEverywhere } = useAuth()
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -48,6 +48,16 @@ function AuthenticatedLayout() {
               className="rounded-md border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-100"
             >
               Sign out
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void logoutEverywhere()
+              }}
+              title="Revoke every token issued to your account, on all devices"
+              className="text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+            >
+              everywhere
             </button>
           </div>
         </div>

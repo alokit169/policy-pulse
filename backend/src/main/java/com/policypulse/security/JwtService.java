@@ -23,12 +23,16 @@ public class JwtService {
         this.expirationMs = expirationMs;
     }
 
-    public String issue(UUID userId, String email, String role) {
+    /** Name of the claim carrying the user's token version. */
+    public static final String VERSION_CLAIM = "ver";
+
+    public String issue(UUID userId, String email, String role, int tokenVersion) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim("email", email)
                 .claim("role", role)
+                .claim(VERSION_CLAIM, tokenVersion)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMs))
                 .signWith(key)

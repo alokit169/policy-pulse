@@ -4,6 +4,7 @@ import com.policypulse.security.JwtAuthFilter;
 import com.policypulse.security.RateLimitFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -83,6 +84,29 @@ public class SecurityConfig {
         body.put("status", status.value());
         body.put("error", message);
         objectMapper.writeValue(response.getOutputStream(), body);
+    }
+
+    /**
+     * Spring Boot registers every Filter bean in the servlet chain automatically.
+     * Both of these are also placed in the security chain by addFilterBefore, so
+     * without this they are registered twice and actually run at the servlet
+     * chain's position rather than where they were placed. OncePerRequestFilter
+     * hides the duplication, but the declared ordering would be a fiction.
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthFilter> jwtAuthFilterRegistration(JwtAuthFilter filter) {
+        return disableAutoRegistration(filter);
+    }
+
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
+        return disableAutoRegistration(filter);
+    }
+
+    private <T extends jakarta.servlet.Filter> FilterRegistrationBean<T> disableAutoRegistration(T filter) {
+        FilterRegistrationBean<T> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

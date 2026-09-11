@@ -182,4 +182,52 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(entries.get(0).getAction()).isEqualTo("LOGIN_FAILURE");
         assertThat(entries.get(0).getMetadata()).isEqualTo("BAD_PASSWORD");
     }
+
+    /**
+     * Deactivating an account already cut off its tokens, but there was no way
+     * to revoke a token stolen from an account that stays active. Raising the
+     * user's token version invalidates every token already issued, on every
+     * device, without touching the account.
+     */
+    @Test
+    void signingOutEverywhereRevokesTokensAlreadyIssued() throws Exception {
+        AppUser user = createActiveAgent();
+        String firstDevice = tokenFor(user);
+        String secondDevice = tokenFor(user);
+
+        mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + firstDevice))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + secondDevice))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/auth/logout-all").header(HttpHeaders.AUTHORIZATION, "Bearer " + firstDevice))
+                .andExpect(status().isNoContent());
+
+        // The token that asked, and every other device, are both cut off.
+        mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + firstDevice))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + secondDevice))
+                .andExpect(status().isUnauthorized());
+
+        // Signing in again still works and yields a usable token.
+        mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(user)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void revokingSessionsIsAudited() throws Exception {
+        AppUser user = createActiveAgent();
+        String token = tokenFor(user);
+
+        mvc.perform(post("/api/auth/logout-all").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        List<AuditLog> entries = auditLogs.findByActorEmailIgnoreCaseOrderByTimestampDesc(user.getEmail());
+        assertThat(entries.stream().map(AuditLog::getAction)).contains("SESSIONS_REVOKED");
+    }
+
+    @Test
+    void logoutAllRequiresAuthentication() throws Exception {
+        mvc.perform(post("/api/auth/logout-all")).andExpect(status().isUnauthorized());
+    }
 }

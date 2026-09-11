@@ -24,6 +24,8 @@ type AuthContextValue = {
   initialising: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  /** Ends this session and every other one, on every device. */
+  logoutEverywhere: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -77,13 +79,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    // Local only: the token stays valid until it expires. Use logoutEverywhere
+    // when the token itself may be compromised.
     setToken(null)
     setUser(null)
   }, [])
 
+  const logoutEverywhere = useCallback(async () => {
+    try {
+      await api.post('/auth/logout-all')
+    } finally {
+      // The token is dead either way once the call has been attempted, and a
+      // failure must not strand the user in a signed-in state.
+      setToken(null)
+      setUser(null)
+    }
+  }, [])
+
   const value = useMemo(
-    () => ({ user, initialising, login, logout }),
-    [user, initialising, login, logout],
+    () => ({ user, initialising, login, logout, logoutEverywhere }),
+    [user, initialising, login, logout, logoutEverywhere],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

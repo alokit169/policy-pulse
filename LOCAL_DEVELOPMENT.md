@@ -146,6 +146,7 @@ performs. Docker must be running.
 | `CustomerIsolationTest` | Tenant and role isolation: no cross-tenant or cross-agent access |
 | `CustomerCrudTest` | Create, update, archive, restore, search, paging, conflicts |
 | `RateLimitFilterTest` | Per-client counting and window eviction |
+| `FilterRegistrationTest` | Security filters are not also auto-registered in the servlet chain |
 
 ### Status codes
 

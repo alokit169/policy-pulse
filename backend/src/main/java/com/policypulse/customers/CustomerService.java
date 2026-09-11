@@ -213,10 +213,23 @@ public class CustomerService {
         return new ApiException(HttpStatus.NOT_FOUND, "Customer not found");
     }
 
-    /** "%" when no term was given, so the query matches every row. */
+    /**
+     * "%" when no term was given, so the query matches every row. Otherwise the
+     * term is escaped, so LIKE metacharacters typed by a user are matched
+     * literally rather than acting as wildcards. "!" is the escape character
+     * rather than a backslash, which would need escaping again in Java, in HQL
+     * and in SQL. The escape character itself is doubled first, or it would
+     * double-escape the escapes added after it.
+     */
     private static String likePattern(String q) {
         String term = blankToNull(q);
-        return term == null ? "%" : "%" + term.toLowerCase(Locale.ROOT) + "%";
+        if (term == null) return "%";
+
+        String escaped = term.toLowerCase(Locale.ROOT)
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escaped + "%";
     }
 
     private static String blankToNull(String value) {

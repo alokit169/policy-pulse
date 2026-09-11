@@ -66,6 +66,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Tokens minted before the user's version was raised are revoked.
+            // A token with no version claim predates this check and is rejected.
+            Integer tokenVersion = claims.get(JwtService.VERSION_CLAIM, Integer.class);
+            if (tokenVersion == null || tokenVersion != user.getTokenVersion()) {
+                log.debug("Rejecting revoked token for user {}: token v{}, current v{}",
+                        userId, tokenVersion, user.getTokenVersion());
+                SecurityContextHolder.clearContext();
+                return;
+            }
+
             AuthUser principal = new AuthUser(user);
             SecurityContextHolder.getContext().setAuthentication(
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
