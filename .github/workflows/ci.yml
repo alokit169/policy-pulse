@@ -299,21 +299,27 @@ jobs:
           TENANT_TZ=$(curl -s -H "$ADMIN_AUTH" http://localhost:5173/api/reminders/configuration \
                       | sed -n 's/.*"timezone":"\([^"]*\)".*/\1/p')
           TENANT_TODAY=$(TZ="$TENANT_TZ" date +%Y-%m-%d)
+          # Reminders are asked for the day before, the day itself and the day
+          # after, so an instalment still matches when this date is a day out —
+          # a tenant day that rolls over mid-run, or a shell that does not honour
+          # TZ and hands back the server's date instead of the tenant's.
 
-          # A window that started at midnight and closed at the top of the current
-          # minute. The reminder is therefore queued for a moment in the past, so
-          # dispatch picks it up, and the call is refused for the one reason being
-          # tested rather than because nothing was due yet.
-          WINDOW_END=$(TZ="$TENANT_TZ" date +%H:%M:00)
-          if [ "$WINDOW_END" = "00:00:00" ]; then WINDOW_END="00:00:01"; fi
+          # A window of one minute at the very start of the tenant's day. Fixed
+          # rather than worked out from the clock: not every shell honours TZ, and
+          # one that quietly does not hands back a window that looks shut and is
+          # not, which is how this was found. Starting at midnight also puts the
+          # reminder's moment in the past, so dispatch picks it up and the call is
+          # refused for the reason being tested rather than for not being due.
+          #
+          # It is wrong for the one minute a day the tenant spends inside it.
 
           voice_config() {
             check "$1" 200 -X PUT http://localhost:5173/api/reminders/configuration \
                            -H "$ADMIN_AUTH" -H "$JSON" \
-                           -d "{\"daysBeforeDue\":\"0\",\"daysAfterDue\":\"2\",\"maxCallAttempts\":3,\"retryDelayMinutes\":60,\"allowedCallingStart\":\"00:00:00\",\"allowedCallingEnd\":\"$2\",\"preferredChannel\":\"VOICE\"}"
+                           -d "{\"daysBeforeDue\":\"0,1\",\"daysAfterDue\":\"1\",\"maxCallAttempts\":3,\"retryDelayMinutes\":60,\"allowedCallingStart\":\"00:00:00\",\"allowedCallingEnd\":\"$2\",\"preferredChannel\":\"VOICE\"}"
           }
 
-          voice_config "close the calling window" "$WINDOW_END"
+          voice_config "close the calling window" "00:01:00"
 
           # A number ending in 7, which the mock provider answers. Endings 0, 1
           # and 2 are its no-answer, busy and unusable cases.
@@ -370,48 +376,48 @@ jobs:
             fi
           fi
 
-          # The follow-up engine. A commitment for a day that has passed, with the
-          # money still owed, has to reach a person; one already paid has to close
-          # itself without anybody being sent to chase it.
+          # The follow-up engine. What a smoke test can prove here is the wiring:
+          # the route, who may use it, that a follow-up whose moment has arrived
+          # comes due, and that running again tells nobody twice.
+          #
+          # Not the calendar. A payment commitment is due at nine in the morning
+          # in the tenant's zone and is only broken once the day it names has
+          # passed, so any check built on one passes or fails depending on the
+          # hour CI happens to run — and on whether the tenant's day rolls over
+          # mid-run, which is how this was found. A follow-up with no date is due
+          # the moment it is recorded, whatever the clock says. The calendar is
+          # FollowUpEngineTest, against a frozen one.
           check "agent may not run the engine" 403 -X POST -H "$AUTH" http://localhost:5173/api/follow-ups/run
 
-          YESTERDAY=$(TZ="$TENANT_TZ" date -d 'yesterday' +%Y-%m-%d)
+          CALLBACK_CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
+                                -H "$AUTH" -H "$JSON" \
+                                -d "{\"firstName\":\"Call\",\"lastName\":\"Back\",\"phone\":\"${PHONE}5\"}" \
+                              | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
 
-          BROKEN_CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
-                              -H "$AUTH" -H "$JSON" \
-                              -d "{\"firstName\":\"Broken\",\"lastName\":\"Promise\",\"phone\":\"${PHONE}5\"}" \
-                            | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-          BROKEN_POLICY=$(curl -s -X POST http://localhost:5173/api/policies \
-                            -H "$AUTH" -H "$JSON" \
-                            -d "{\"customerId\":\"$BROKEN_CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"3000.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"$YESTERDAY\",\"policyEndDate\":\"$YESTERDAY\"}" \
-                          | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-
-          # A commitment cannot be recorded for a day already gone, so a promise
-          # that is genuinely broken cannot be built through the API inside one
-          # run. What this proves is the wiring and the near edge: a commitment
-          # comes due, is not called broken while the day it names still has time
-          # to run, and is not announced twice. The calendar itself — the day
-          # passing, the escalation, the task raised once — is FollowUpEngineTest,
-          # against a frozen clock.
-          check "record a commitment" 201 -X POST http://localhost:5173/api/follow-ups \
+          check "record a follow-up"  201 -X POST http://localhost:5173/api/follow-ups \
                                         -H "$AUTH" -H "$JSON" \
-                                        -d "{\"customerId\":\"$BROKEN_CUSTOMER\",\"policyId\":\"$BROKEN_POLICY\",\"reason\":\"PAYMENT_COMMITMENT\",\"commitmentDate\":\"$TENANT_TODAY\"}"
+                                        -d "{\"customerId\":\"$CALLBACK_CUSTOMER\",\"reason\":\"CALLBACK_REQUESTED\"}"
+
+          UNREAD_BEFORE=$(curl -s -H "$AUTH" http://localhost:5173/api/notifications/unread-count \
+                          | sed -n 's/.*"unread":\([0-9]*\).*/\1/p')
 
           RUN=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run)
           if echo "$RUN" | grep -q '"broughtDue":0'; then
-            echo "FAIL  a commitment due today did not come due: $RUN"
+            echo "FAIL  a follow-up whose moment had arrived did not come due: $RUN"
             failed=1
           else
-            echo "ok    a commitment due today came due"
+            echo "ok    a follow-up whose moment had arrived came due"
           fi
+
+          # Only a payment commitment can be broken, and this is not one.
           if echo "$RUN" | grep -q '"escalated":0'; then
-            echo "ok    a promise with the day still to run was not called broken"
+            echo "ok    a callback request was never called a broken promise"
           else
-            echo "FAIL  a promise was called broken on the day it was made for: $RUN"
+            echo "FAIL  a callback request was escalated: $RUN"
             failed=1
           fi
 
-          # Running again must not tell anybody a second time.
+          # The sweep runs hourly, so being told once has to mean once.
           AGAIN=$(curl -s -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run)
           if echo "$AGAIN" | grep -q '"broughtDue":0'; then
             echo "ok    the engine is repeatable (nobody was told twice)"
@@ -420,34 +426,12 @@ jobs:
             failed=1
           fi
 
-          # A promise already kept closes itself rather than sending somebody to
-          # ring a customer who has paid.
-          PAID_CUSTOMER=$(curl -s -X POST http://localhost:5173/api/customers \
-                            -H "$AUTH" -H "$JSON" \
-                            -d "{\"firstName\":\"Already\",\"lastName\":\"Paid\",\"phone\":\"${PHONE}6\"}" \
-                          | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-          PAID_POLICY=$(curl -s -X POST http://localhost:5173/api/policies \
-                          -H "$AUTH" -H "$JSON" \
-                          -d "{\"customerId\":\"$PAID_CUSTOMER\",\"insuranceProvider\":\"Example Life\",\"policyType\":\"TERM\",\"premiumAmount\":\"3000.00\",\"premiumFrequency\":\"YEARLY\",\"policyStartDate\":\"$TENANT_TODAY\",\"policyEndDate\":\"$TENANT_TODAY\"}" \
-                        | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-          PAID_PREMIUM=$(curl -s -H "$AUTH" "http://localhost:5173/api/policies/$PAID_POLICY/premiums" \
-                         | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
-
-          FOLLOW_UP=$(curl -s -X POST http://localhost:5173/api/follow-ups \
-                        -H "$AUTH" -H "$JSON" \
-                        -d "{\"customerId\":\"$PAID_CUSTOMER\",\"policyId\":\"$PAID_POLICY\",\"reason\":\"PAYMENT_COMMITMENT\",\"commitmentDate\":\"$TENANT_TODAY\"}" \
-                      | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-
-          check "record the payment" 200 \
-                -X POST "http://localhost:5173/api/policies/$PAID_POLICY/premiums/$PAID_PREMIUM/pay" \
-                -H "$AUTH" -H "$JSON" -d '{"paymentMethod":"UPI"}'
-
-          curl -s -o /dev/null -X POST -H "$ADMIN_AUTH" http://localhost:5173/api/follow-ups/run
-          SETTLED=$(curl -s -H "$AUTH" "http://localhost:5173/api/follow-ups/$FOLLOW_UP")
-          if echo "$SETTLED" | grep -q '"status":"COMPLETED"'; then
-            echo "ok    a promise already kept closed itself"
+          UNREAD_AFTER=$(curl -s -H "$AUTH" http://localhost:5173/api/notifications/unread-count \
+                         | sed -n 's/.*"unread":\([0-9]*\).*/\1/p')
+          if [ "$UNREAD_AFTER" = "$((UNREAD_BEFORE + 1))" ]; then
+            echo "ok    the agent was told exactly once across both runs"
           else
-            echo "FAIL  nobody paid attention to the payment: $SETTLED"
+            echo "FAIL  unread went from $UNREAD_BEFORE to $UNREAD_AFTER across two runs"
             failed=1
           fi
 

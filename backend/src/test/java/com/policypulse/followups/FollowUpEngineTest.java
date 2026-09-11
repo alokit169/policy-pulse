@@ -46,7 +46,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
 
     private static final AtomicLong SEQ = new AtomicLong(System.nanoTime());
 
-    @Autowired private FollowUpEngine engine;
+    @Autowired private FollowUpRunner runner;
     @Autowired private FollowUpRepository followUps;
     @Autowired private CustomerRepository customers;
     @Autowired private PolicyRepository policies;
@@ -141,7 +141,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TODAY, Domain.PremiumStatus.DUE);
         FollowUp followUp = commitment(scene, TODAY, true);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.broughtDue()).isEqualTo(1);
         assertThat(reloaded(followUp).getStatus()).isEqualTo(Domain.FollowUpStatus.DUE);
@@ -160,8 +160,8 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TODAY, Domain.PremiumStatus.DUE);
         commitment(scene, TODAY, true);
 
-        engine.runForOrganization(scene.org().getId());
-        FollowUpEngine.Result second = engine.runForOrganization(scene.org().getId());
+        runner.runFor(scene.org().getId());
+        FollowUpEngine.Result second = runner.runFor(scene.org().getId());
 
         assertThat(second.broughtDue()).isZero();
         assertThat(notificationsFor(scene)).hasSize(1);
@@ -177,7 +177,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TODAY, Domain.PremiumStatus.PAID);
         FollowUp followUp = commitment(scene, TODAY, true);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.settled()).isEqualTo(1);
         assertThat(result.broughtDue()).as("nobody had to be told about it").isZero();
@@ -195,7 +195,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TODAY, Domain.PremiumStatus.WAIVED);
         FollowUp followUp = commitment(scene, TODAY, true);
 
-        engine.runForOrganization(scene.org().getId());
+        runner.runFor(scene.org().getId());
 
         assertThat(reloaded(followUp).getStatus()).isEqualTo(Domain.FollowUpStatus.COMPLETED);
     }
@@ -211,7 +211,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TOMORROW.plusYears(1), Domain.PremiumStatus.UPCOMING);
         FollowUp followUp = commitment(scene, TODAY, true);
 
-        engine.runForOrganization(scene.org().getId());
+        runner.runFor(scene.org().getId());
 
         assertThat(reloaded(followUp).getStatus())
                 .as("the promise was about what was owed by the day they named")
@@ -225,7 +225,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TODAY, Domain.PremiumStatus.DUE);
         FollowUp followUp = commitment(scene, TODAY, true);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.escalated()).isZero();
         assertThat(reloaded(followUp).getEscalatedAt()).isNull();
@@ -238,7 +238,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, YESTERDAY, Domain.PremiumStatus.OVERDUE);
         FollowUp followUp = commitment(scene, YESTERDAY, true);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.escalated()).isEqualTo(1);
         assertThat(reloaded(followUp).getEscalatedAt()).isNotNull();
@@ -257,9 +257,9 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, YESTERDAY, Domain.PremiumStatus.OVERDUE);
         commitment(scene, YESTERDAY, true);
 
-        engine.runForOrganization(scene.org().getId());
-        engine.runForOrganization(scene.org().getId());
-        engine.runForOrganization(scene.org().getId());
+        runner.runFor(scene.org().getId());
+        runner.runFor(scene.org().getId());
+        runner.runFor(scene.org().getId());
 
         assertThat(tasksFor(scene)).hasSize(1);
     }
@@ -278,7 +278,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
 
         FollowUp followUp = commitment(scene, YESTERDAY, true);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.escalated()).isZero();
         assertThat(tasksFor(scene)).isEmpty();
@@ -296,7 +296,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         Scene scene = given();
         FollowUp followUp = commitment(scene, YESTERDAY, false);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.settled()).isZero();
         assertThat(result.escalated()).isEqualTo(1);
@@ -309,7 +309,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, TOMORROW, Domain.PremiumStatus.UPCOMING);
         FollowUp followUp = commitment(scene, TOMORROW, true);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result).isEqualTo(new FollowUpEngine.Result(0, 0, 0));
         assertThat(reloaded(followUp).getStatus()).isEqualTo(Domain.FollowUpStatus.OPEN);
@@ -324,7 +324,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         followUp.setStatus(Domain.FollowUpStatus.CANCELLED);
         followUps.save(followUp);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result).isEqualTo(new FollowUpEngine.Result(0, 0, 0));
         assertThat(reloaded(followUp).getStatus()).isEqualTo(Domain.FollowUpStatus.CANCELLED);
@@ -340,7 +340,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         commitment(ours, YESTERDAY, true);
         FollowUp other = commitment(theirs, YESTERDAY, true);
 
-        engine.runForOrganization(ours.org().getId());
+        runner.runFor(ours.org().getId());
 
         assertThat(reloaded(other).getStatus()).isEqualTo(Domain.FollowUpStatus.OPEN);
         assertThat(tasksFor(theirs)).isEmpty();
@@ -358,7 +358,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         instalment(scene, YESTERDAY, Domain.PremiumStatus.OVERDUE);
         commitment(scene, YESTERDAY, true);
 
-        engine.runForOrganization(scene.org().getId());
+        runner.runFor(scene.org().getId());
 
         assertThat(notificationsFor(scene))
                 .singleElement()
@@ -366,6 +366,51 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
                     assertThat(n.getTitle()).doesNotContain("today");
                     assertThat(n.getBody()).contains("14 September");
                 });
+    }
+
+    /**
+     * "Nothing owed" is not "paid". A policy with no schedule owes nothing and
+     * has been paid nothing, and closing a follow-up over it would put a sentence
+     * in the record that is not true.
+     */
+    @Test
+    void aPolicyWithNothingToPayIsNotCalledPaid() {
+        Scene scene = given(); // a policy, but no instalments on it at all
+        FollowUp followUp = commitment(scene, TODAY, true);
+
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
+
+        assertThat(result.settled()).isZero();
+        FollowUp after = reloaded(followUp);
+        assertThat(after.getStatus()).isEqualTo(Domain.FollowUpStatus.DUE);
+        assertThat(after.getNotes()).isNull();
+    }
+
+    /**
+     * The engine watches a follow-up until it has either closed it or handed it
+     * to a person, and then stops. Keeping announced work in the queue means an
+     * agency that lets its follow-ups pile up eventually fills the batch with
+     * work nothing can act on, and never sees a new one come due at all.
+     */
+    @Test
+    void anUnattendedBacklogDoesNotCrowdOutSomethingNew() {
+        Scene scene = given();
+
+        // More than one sweep can carry, every one of them already handed over
+        // and every one older than the follow-up that matters.
+        for (int i = 0; i < 250; i++) {
+            FollowUp stale = commitment(scene, YESTERDAY.minusDays(i + 2), true);
+            stale.setStatus(Domain.FollowUpStatus.DUE);
+            stale.setEscalatedAt(java.time.Instant.now());
+            followUps.save(stale);
+        }
+
+        FollowUp fresh = commitment(scene, TODAY, true);
+        instalment(scene, TODAY, Domain.PremiumStatus.DUE);
+
+        runner.runFor(scene.org().getId());
+
+        assertThat(reloaded(fresh).getStatus()).isEqualTo(Domain.FollowUpStatus.DUE);
     }
 
     /** A non-payment follow-up has no books to read and no promise to break. */
@@ -381,7 +426,7 @@ class FollowUpEngineTest extends AbstractIntegrationTest {
         followUp.setStatus(Domain.FollowUpStatus.OPEN);
         followUps.save(followUp);
 
-        FollowUpEngine.Result result = engine.runForOrganization(scene.org().getId());
+        FollowUpEngine.Result result = runner.runFor(scene.org().getId());
 
         assertThat(result.broughtDue()).isEqualTo(1);
         assertThat(result.escalated()).isZero();

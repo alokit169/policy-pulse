@@ -159,6 +159,7 @@ performs. Docker must be running.
 | `ConversationTest` | Transcripts, closing, tenant and agent visibility |
 | `FollowUpTest` | Commitments, ownership, timezone-aware due moments |
 | `FollowUpEngineTest` | Promises kept closing themselves, promises broken reaching a person |
+| `FollowUpConcurrencyTest` | Two sweeps racing for one follow-up tell the agent once |
 | `AiSafetyTest` | What the assistant may cause, and above all what it may not |
 | `MockAIProviderTest` | Intent rules, including that only the customer is read |
 | `VoiceCallTest` | The calling window, attempt limits, retries and the transcript a call leaves |

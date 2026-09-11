@@ -187,6 +187,15 @@ customer who did pay gets chased anyway.
 **A promise is only broken once the day it named has passed.** Somebody who said
 Friday has all of Friday, and it is escalated once rather than every hour.
 
+**Each of the three is taken with a conditional update**, not decided from a
+status read a moment earlier. The hourly sweep and a manager pressing the button
+can want the same follow-up at the same instant, and a read-then-write lets both
+through: the agent is told twice and two identical tasks appear in their queue.
+
+**Nothing owed is not the same as paid.** A policy with no schedule owes nothing
+and has been paid nothing. A follow-up is only closed as settled when there was
+an instalment to settle, so the record never says a payment was made that was not.
+
 ## Known gaps
 
 These are understood and deferred, not overlooked.

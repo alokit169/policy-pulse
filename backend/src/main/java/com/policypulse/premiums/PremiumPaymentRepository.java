@@ -42,6 +42,17 @@ public interface PremiumPaymentRepository extends JpaRepository<PremiumPayment, 
             """)
     long countOwedOnOrBefore(@Param("policy") UUID policyId, @Param("on") LocalDate on);
 
+    /**
+     * Whether there was ever anything to pay by that day. Nothing owed means
+     * nothing was paid when there was never an instalment in the first place, and
+     * a policy with no schedule would otherwise look settled.
+     */
+    @Query("""
+            SELECT COUNT(p) FROM PremiumPayment p
+            WHERE p.policyId = :policy AND p.dueDate <= :on
+            """)
+    long countDueOnOrBefore(@Param("policy") UUID policyId, @Param("on") LocalDate on);
+
     /** Somebody is already checking a claimed payment against the books. */
     long countByPolicyIdAndVerificationPendingTrue(UUID policyId);
 }

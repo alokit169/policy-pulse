@@ -29,11 +29,11 @@ public class FollowUpRunner {
     }
 
     public FollowUpEngine.Result runAll() {
-        FollowUpEngine.Result total = new FollowUpEngine.Result(0, 0, 0);
+        FollowUpEngine.Result total = FollowUpEngine.Result.NOTHING;
 
         for (UUID organizationId : organizations.findIdsByStatus(Domain.EntityStatus.ACTIVE)) {
             try {
-                total = total.plus(engine.runForOrganization(organizationId));
+                total = total.plus(runFor(organizationId));
             } catch (RuntimeException ex) {
                 // One tenant's bad data must not stop the rest of the run.
                 log.error("The follow-up engine failed for organization {}", organizationId, ex);
@@ -47,8 +47,21 @@ public class FollowUpRunner {
         return total;
     }
 
-    /** One tenant, for the on-demand run. */
+    /**
+     * One tenant. Each follow-up is taken on its own so one bad row does not cost
+     * the agency the whole sweep, and so nothing holds a transaction open across
+     * the lot of them.
+     */
     public FollowUpEngine.Result runFor(UUID organizationId) {
-        return engine.runForOrganization(organizationId);
+        FollowUpEngine.Result total = FollowUpEngine.Result.NOTHING;
+
+        for (UUID followUpId : engine.workableIds(organizationId)) {
+            try {
+                total = total.plus(engine.workOne(followUpId));
+            } catch (RuntimeException ex) {
+                log.error("The follow-up engine failed on follow-up {}", followUpId, ex);
+            }
+        }
+        return total;
     }
 }
