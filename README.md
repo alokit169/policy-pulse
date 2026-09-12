@@ -90,7 +90,7 @@ Some of the rules are more interesting than the features:
 ## How it is built
 
 Spring Boot 3.3 on Java 21, PostgreSQL 16 with Flyway, React 18 with TypeScript
-and Vite, nginx in front. 125 backend source files, 38 API endpoints, 12
+and Vite, nginx in front. 125 backend source files, 46 API endpoints, 12
 migrations.
 
 ```
@@ -119,7 +119,9 @@ migrations and `ddl-auto=validate` are exercised exactly as a real boot would,
 and against a frozen clock so anything depending on "today" is deterministic.
 
 CI runs both, builds the frontend, then stands the whole Docker stack up and puts
-74 checks through nginx the way a browser would.
+74 checks through nginx the way a browser would. Between them they cover 44 of
+the 46 endpoints; [TESTING.md](TESTING.md) says which two they do not, and how to
+work through everything by hand.
 
 One habit is worth naming, because it found things reading never did: **a green
 test is not evidence until the red one has been seen.** Five separate bugs in
@@ -147,6 +149,7 @@ Written down rather than left to be discovered:
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, the flow between them, and the phase roadmap |
 | [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) | Running it, VS Code, the test suites, watching each part work |
+| [TESTING.md](TESTING.md) | What checks each of the 46 endpoints, the two nothing checks, and a walkthrough by hand |
 | [DATABASE.md](DATABASE.md) | Schema, migrations and how tenancy is enforced |
 | [SECURITY.md](SECURITY.md) | The auth model, isolation, what the assistant and the calling path may do, and every known gap |
 
