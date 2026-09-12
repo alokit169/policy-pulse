@@ -5,7 +5,12 @@ import { useBusy } from './useBusy'
 function Probe({ action }: { action: () => Promise<void> }) {
   const { busy, run } = useBusy()
   return (
-    <button type="button" disabled={busy} onClick={() => void run(action)}>
+    <button
+      type="button"
+      disabled={busy}
+      // run passes a failure on to its caller, so the caller has to want it.
+      onClick={() => void run(action).catch(() => {})}
+    >
       {busy ? 'working' : 'go'}
     </button>
   )

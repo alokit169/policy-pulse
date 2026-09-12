@@ -12,6 +12,10 @@ import { useCallback, useRef, useState } from 'react'
  * <p>The ref is what actually holds the door: it changes the moment it is set,
  * where the state is only for showing the button as busy.
  *
+ * <p>A failure in the action is passed on rather than swallowed, so a caller
+ * that fires and forgets has to say so. Every handler here catches its own
+ * errors inside the action, because each one has its own thing to say.
+ *
  * @returns busy, for the UI, and run, which the handler wraps its work in
  */
 export function useBusy(): {

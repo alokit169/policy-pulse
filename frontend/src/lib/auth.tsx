@@ -88,6 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutEverywhere = useCallback(async () => {
     try {
       await api.post('/auth/logout-all')
+    } catch {
+      // Swallowed on purpose. The session is cleared below whatever happened,
+      // and there is nothing the caller could usefully do with the failure —
+      // every one of them fires this and walks away, so a rejection here is an
+      // unhandled one.
     } finally {
       // The token is dead either way once the call has been attempted, and a
       // failure must not strand the user in a signed-in state.
