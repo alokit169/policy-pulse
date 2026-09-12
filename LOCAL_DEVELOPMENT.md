@@ -222,8 +222,40 @@ should sign in. `403` means the caller is authenticated but not permitted. Sprin
 returns `403` for anonymous requests by default; `SecurityConfig` overrides that
 so a SPA can tell the two apart.
 
-CI runs the same suite plus the frontend build and a smoke test of the full
-Docker stack. See `.github/workflows/ci.yml`.
+### The frontend suite
+
+`npm test` in `frontend/`, or `npm run test:watch` while working. Vitest and
+Testing Library against jsdom; CI runs it as its own step before the build, so a
+behavioural regression fails the build rather than only a type error.
+
+The tests drive components the way somebody uses them — type in the field, click
+the button — and stub the API layer rather than the network, so a change to a
+request's shape shows up as a failing test rather than a passing one against a
+mock nobody updated.
+
+CI runs both suites plus the frontend build and a smoke test of the full Docker
+stack. See `.github/workflows/ci.yml`.
+
+### Running the smoke test by hand
+
+It lives in `ci.yml` rather than as a script, so pull it out and run it against a
+stack that is already up:
+
+```bash
+python -c "import yaml,io,sys; d=yaml.safe_load(io.open('.github/workflows/ci.yml',encoding='utf-8'));   step=[s for s in d['jobs']['compose']['steps'] if s.get('name','').startswith('Smoke test')][0];   io.open('smoke.sh','w',newline='
+').write(step['run'])"
+bash smoke.sh
+```
+
+One run makes more than `RATE_LIMIT_RPM` requests, so a second run started
+straight after the first is answered with `429` most of the way down and looks
+like a catalogue of failures. Wait for the minute to roll over, or raise
+`RATE_LIMIT_RPM` for the local stack. The limiter is doing its job; it is only
+worth knowing because the failure looks like something else entirely.
+
+Everything in the script is repeatable against the same database. The one place
+that changes seeded state — the password change — puts it back afterwards, for
+exactly that reason.
 
 ### Watching a message go out
 

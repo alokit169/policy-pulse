@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import {
   addMessage,
   closeConversation,
@@ -49,7 +50,7 @@ export default function ConversationDetail() {
 
   const [conversation, setConversation] = useState<Conversation | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -89,30 +90,28 @@ export default function ConversationDetail() {
     event.preventDefault()
     if (!id || !text.trim()) return
     setError(null)
-    setBusy(true)
-    try {
-      await addMessage(id, { sender, message: text.trim() })
-      setText('')
-      await reload()
-    } catch (err) {
-      setError(errorMessage(err, 'Could not add that line'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        await addMessage(id, { sender, message: text.trim() })
+        setText('')
+        await reload()
+      } catch (err) {
+        setError(errorMessage(err, 'Could not add that line'))
+      }
+    })
   }
 
   async function onClose() {
     if (!id) return
     setError(null)
-    setBusy(true)
-    try {
-      setConversation(await closeConversation(id, { outcome: outcome || undefined, summary: summary || undefined }))
-      setNotice('Conversation closed.')
-    } catch (err) {
-      setError(errorMessage(err, 'Could not close the conversation'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        setConversation(await closeConversation(id, { outcome: outcome || undefined, summary: summary || undefined }))
+        setNotice('Conversation closed.')
+      } catch (err) {
+        setError(errorMessage(err, 'Could not close the conversation'))
+      }
+    })
   }
 
   async function onCreateFollowUp(event: FormEvent) {
@@ -120,36 +119,34 @@ export default function ConversationDetail() {
     if (!conversation) return
     setError(null)
     setNotice(null)
-    setBusy(true)
-    try {
-      await createFollowUp({
-        customerId: conversation.customerId,
-        conversationId: conversation.id,
-        reason,
-        commitmentDate: commitmentDate || null,
-      })
-      setNotice('Follow-up recorded.')
-      setCommitmentDate('')
-    } catch (err) {
-      setError(errorMessage(err, 'Could not record the follow-up'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        await createFollowUp({
+          customerId: conversation.customerId,
+          conversationId: conversation.id,
+          reason,
+          commitmentDate: commitmentDate || null,
+        })
+        setNotice('Follow-up recorded.')
+        setCommitmentDate('')
+      } catch (err) {
+        setError(errorMessage(err, 'Could not record the follow-up'))
+      }
+    })
   }
 
   async function onAnalyse() {
     if (!id) return
     setError(null)
     setNotice(null)
-    setBusy(true)
-    try {
-      setAnalysis(await analyseConversation(id))
-      await reload()
-    } catch (err) {
-      setError(errorMessage(err, 'Could not analyse the conversation'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        setAnalysis(await analyseConversation(id))
+        await reload()
+      } catch (err) {
+        setError(errorMessage(err, 'Could not analyse the conversation'))
+      }
+    })
   }
 
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>

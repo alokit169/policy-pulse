@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import {
   archiveCustomer,
   createCustomer,
@@ -71,7 +72,7 @@ export default function CustomerForm() {
   const [existing, setExisting] = useState<Customer | null>(null)
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(isEdit)
-  const [saving, setSaving] = useState(false)
+  const { busy: saving, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -126,34 +127,32 @@ export default function CustomerForm() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    setSaving(true)
-    try {
-      const payload = toPayload(form)
-      const saved = id ? await updateCustomer(id, payload) : await createCustomer(payload)
-      navigate(`/customers/${saved.id}`, { replace: true })
-    } catch (err) {
-      setError(errorMessage(err, 'Could not save this customer'))
-    } finally {
-      setSaving(false)
-    }
+    await run(async () => {
+      try {
+        const payload = toPayload(form)
+        const saved = id ? await updateCustomer(id, payload) : await createCustomer(payload)
+        navigate(`/customers/${saved.id}`, { replace: true })
+      } catch (err) {
+        setError(errorMessage(err, 'Could not save this customer'))
+      }
+    })
   }
 
   async function onArchiveToggle() {
     if (!id || !existing) return
     setError(null)
-    setSaving(true)
-    try {
-      if (existing.status === 'INACTIVE') {
-        setExisting(await restoreCustomer(id))
-      } else {
-        await archiveCustomer(id)
-        setExisting(await getCustomer(id))
+    await run(async () => {
+      try {
+        if (existing.status === 'INACTIVE') {
+          setExisting(await restoreCustomer(id))
+        } else {
+          await archiveCustomer(id)
+          setExisting(await getCustomer(id))
+        }
+      } catch (err) {
+        setError(errorMessage(err, 'Could not change the status'))
       }
-    } catch (err) {
-      setError(errorMessage(err, 'Could not change the status'))
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>

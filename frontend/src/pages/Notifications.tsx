@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -23,7 +24,7 @@ export default function Notifications() {
   const [rows, setRows] = useState<Notification[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
 
   async function load(showSpinner = true) {
@@ -61,27 +62,25 @@ export default function Notifications() {
   }, [unreadOnly])
 
   async function onMarkRead(id: string) {
-    setBusy(true)
-    try {
-      await markNotificationRead(id)
-      await load(false)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not mark it read'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        await markNotificationRead(id)
+        await load(false)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not mark it read'))
+      }
+    })
   }
 
   async function onMarkAllRead() {
-    setBusy(true)
-    try {
-      await markAllNotificationsRead()
-      await load(false)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not mark them read'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        await markAllNotificationsRead()
+        await load(false)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not mark them read'))
+      }
+    })
   }
 
   return (

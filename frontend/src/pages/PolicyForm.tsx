@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import { listCustomers } from '../lib/customers'
 import type { Customer } from '../lib/customers'
 import {
@@ -102,7 +103,7 @@ export default function PolicyForm() {
   const [premiums, setPremiums] = useState<Premium[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(isEdit)
-  const [saving, setSaving] = useState(false)
+  const { busy: saving, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
 
   // Only needed when creating: an existing policy shows its customer as a link.
@@ -159,38 +160,36 @@ export default function PolicyForm() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    setSaving(true)
-    try {
-      const payload = toPayload(form)
-      const saved = id ? await updatePolicy(id, payload) : await createPolicy(payload)
-      if (id) {
-        setExisting(saved)
-        setPremiums(await listPremiums(id))
-      } else {
-        navigate(`/policies/${saved.id}`, { replace: true })
+    await run(async () => {
+      try {
+        const payload = toPayload(form)
+        const saved = id ? await updatePolicy(id, payload) : await createPolicy(payload)
+        if (id) {
+          setExisting(saved)
+          setPremiums(await listPremiums(id))
+        } else {
+          navigate(`/policies/${saved.id}`, { replace: true })
+        }
+      } catch (err) {
+        setError(errorMessage(err, 'Could not save this policy'))
       }
-    } catch (err) {
-      setError(errorMessage(err, 'Could not save this policy'))
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   async function settle(premiumId: string, action: 'pay' | 'waive') {
     if (!id) return
     setError(null)
-    setSaving(true)
-    try {
-      if (action === 'pay') await payPremium(id, premiumId, {})
-      else await waivePremium(id, premiumId)
+    await run(async () => {
+      try {
+        if (action === 'pay') await payPremium(id, premiumId, {})
+        else await waivePremium(id, premiumId)
 
-      setPremiums(await listPremiums(id))
-      setExisting(await getPolicy(id))
-    } catch (err) {
-      setError(errorMessage(err, 'Could not update the premium'))
-    } finally {
-      setSaving(false)
-    }
+        setPremiums(await listPremiums(id))
+        setExisting(await getPolicy(id))
+      } catch (err) {
+        setError(errorMessage(err, 'Could not update the premium'))
+      }
+    })
   }
 
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>

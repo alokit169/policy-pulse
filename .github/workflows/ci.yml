@@ -60,6 +60,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Test
+        working-directory: frontend
+        run: npm test
+
       # Runs tsc --noEmit and then the production build.
       - name: Build
         working-directory: frontend
@@ -569,6 +573,20 @@ jobs:
           check "the new password works" 200 -X POST http://localhost:5173/api/auth/login \
                                         -H "$JSON" \
                                         -d '{"email":"agent2@demo.local","password":"a-much-longer-passphrase"}'
+
+          # Put it back. Everything else in this script is repeatable against the
+          # same database, and a check that quietly depends on a fresh one passes
+          # in CI and fails for whoever runs it twice.
+          NEW_TOKEN=$(curl -s -X POST http://localhost:5173/api/auth/login \
+                        -H "$JSON" \
+                        -d '{"email":"agent2@demo.local","password":"a-much-longer-passphrase"}' \
+                      | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          check "change it back"         204 -X POST http://localhost:5173/api/auth/change-password \
+                                        -H "Authorization: Bearer $NEW_TOKEN" -H "$JSON" \
+                                        -d '{"currentPassword":"a-much-longer-passphrase","newPassword":"Password123!"}'
+          check "the demo password works again" 200 -X POST http://localhost:5173/api/auth/login \
+                                        -H "$JSON" \
+                                        -d '{"email":"agent2@demo.local","password":"Password123!"}'
 
           exit $failed
 

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
+import { localPath } from '../lib/navigation'
 import { useAuth } from '../lib/auth'
 
 export default function Login() {
@@ -12,25 +14,26 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const { busy: submitting, run } = useBusy()
 
-  // Where RequireAuth sent us from, so a deep link survives the login round trip.
-  const from = (location.state as { from?: string } | null)?.from ?? '/'
+  // Where RequireAuth sent us from, so a deep link survives the login round
+  // trip. Checked rather than trusted: it comes from the URL the user arrived
+  // at, so anybody who can send them a link chooses it.
+  const from = localPath((location.state as { from?: string } | null)?.from)
 
   if (user) return <Navigate to={from} replace />
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    setSubmitting(true)
-    try {
-      await login(email, password)
-      navigate(from, { replace: true })
-    } catch (err) {
-      setError(errorMessage(err, 'Could not sign in'))
-    } finally {
-      setSubmitting(false)
-    }
+    await run(async () => {
+      try {
+        await login(email, password)
+        navigate(from, { replace: true })
+      } catch (err) {
+        setError(errorMessage(err, 'Could not sign in'))
+      }
+    })
   }
 
   return (

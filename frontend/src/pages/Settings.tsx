@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { useBusy } from '../lib/useBusy'
 
 const MINIMUM = 12
 
@@ -16,7 +17,7 @@ export default function Settings() {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
@@ -28,18 +29,17 @@ export default function Settings() {
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
-    setBusy(true)
-    try {
-      await api.post('/auth/change-password', { currentPassword: current, newPassword: next })
-      setDone(true)
-      // The token that made this request is already dead. Clearing it here is
-      // what turns that into a sign-in page rather than a wall of 401s.
-      window.setTimeout(logout, 2500)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not change your password'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        await api.post('/auth/change-password', { currentPassword: current, newPassword: next })
+        setDone(true)
+        // The token that made this request is already dead. Clearing it here is
+        // what turns that into a sign-in page rather than a wall of 401s.
+        window.setTimeout(logout, 2500)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not change your password'))
+      }
+    })
   }
 
   if (done) {

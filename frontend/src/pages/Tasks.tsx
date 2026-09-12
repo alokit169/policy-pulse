@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import { cancelTask, completeTask, listTasks } from '../lib/tasks'
 import type { HumanTask, TaskPriority, TaskStatus } from '../lib/tasks'
 
@@ -61,7 +62,7 @@ export default function Tasks() {
   const [rows, setRows] = useState<HumanTask[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
@@ -90,16 +91,15 @@ export default function Tasks() {
 
   async function settle(id: string, action: 'complete' | 'cancel') {
     setError(null)
-    setBusy(true)
-    try {
-      if (action === 'complete') await completeTask(id)
-      else await cancelTask(id)
-      setReloadToken((t) => t + 1)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not update the task'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        if (action === 'complete') await completeTask(id)
+        else await cancelTask(id)
+        setReloadToken((t) => t + 1)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not update the task'))
+      }
+    })
   }
 
   return (

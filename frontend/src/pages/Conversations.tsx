@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import { listCustomers } from '../lib/customers'
 import type { Customer } from '../lib/customers'
 import { listConversations, startConversation } from '../lib/engagement'
@@ -45,7 +46,7 @@ export default function Conversations() {
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [logging, setLogging] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const { busy: saving, run } = useBusy()
   const [customerId, setCustomerId] = useState('')
   const [channel, setChannel] = useState<Channel>('VOICE')
   const [direction, setDirection] = useState<ConversationDirection>('OUTBOUND')
@@ -79,15 +80,14 @@ export default function Conversations() {
   async function onLog(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    setSaving(true)
-    try {
-      const created = await startConversation({ customerId, channel, direction })
-      navigate(`/conversations/${created.id}`)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not log the conversation'))
-    } finally {
-      setSaving(false)
-    }
+    await run(async () => {
+      try {
+        const created = await startConversation({ customerId, channel, direction })
+        navigate(`/conversations/${created.id}`)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not log the conversation'))
+      }
+    })
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import { useAuth } from '../lib/auth'
 import { cancelFollowUp, completeFollowUp, listFollowUps, runFollowUpEngine } from '../lib/engagement'
 import type { FollowUp, FollowUpStatus } from '../lib/engagement'
@@ -41,7 +42,7 @@ export default function FollowUps() {
   const [rows, setRows] = useState<FollowUp[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
@@ -71,35 +72,33 @@ export default function FollowUps() {
   async function onRunNow() {
     setError(null)
     setNotice(null)
-    setBusy(true)
-    try {
-      const result = await runFollowUpEngine()
-      const parts = [
-        `${result.broughtDue} came due`,
-        `${result.settled} had already been paid`,
-        `${result.escalated} promise${result.escalated === 1 ? '' : 's'} broken`,
-      ]
-      setNotice(`${parts.join(', ')}. Running this again is always safe.`)
-      setReloadToken((t) => t + 1)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not work through the follow-ups'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        const result = await runFollowUpEngine()
+        const parts = [
+          `${result.broughtDue} came due`,
+          `${result.settled} had already been paid`,
+          `${result.escalated} promise${result.escalated === 1 ? '' : 's'} broken`,
+        ]
+        setNotice(`${parts.join(', ')}. Running this again is always safe.`)
+        setReloadToken((t) => t + 1)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not work through the follow-ups'))
+      }
+    })
   }
 
   async function settle(id: string, action: 'complete' | 'cancel') {
     setError(null)
-    setBusy(true)
-    try {
-      if (action === 'complete') await completeFollowUp(id)
-      else await cancelFollowUp(id)
-      setReloadToken((t) => t + 1)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not update the follow-up'))
-    } finally {
-      setBusy(false)
-    }
+    await run(async () => {
+      try {
+        if (action === 'complete') await completeFollowUp(id)
+        else await cancelFollowUp(id)
+        setReloadToken((t) => t + 1)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not update the follow-up'))
+      }
+    })
   }
 
   return (

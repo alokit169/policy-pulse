@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { errorMessage } from '../lib/api'
+import { useBusy } from '../lib/useBusy'
 import { useAuth } from '../lib/auth'
 import {
   detectRemindersNow,
@@ -47,7 +48,7 @@ export default function Reminders() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [config, setConfig] = useState<ReminderConfiguration | null>(null)
-  const [saving, setSaving] = useState(false)
+  const { busy: saving, run } = useBusy()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -80,40 +81,38 @@ export default function Reminders() {
     if (!config) return
     setError(null)
     setNotice(null)
-    setSaving(true)
-    try {
-      const { timezone, ...editable } = config
-      void timezone
-      setConfig(await updateReminderConfiguration(editable))
-      setNotice('Settings saved.')
-    } catch (err) {
-      setError(errorMessage(err, 'Could not save the settings'))
-    } finally {
-      setSaving(false)
-    }
+    await run(async () => {
+      try {
+        const { timezone, ...editable } = config
+        void timezone
+        setConfig(await updateReminderConfiguration(editable))
+        setNotice('Settings saved.')
+      } catch (err) {
+        setError(errorMessage(err, 'Could not save the settings'))
+      }
+    })
   }
 
   async function onDetectNow() {
     setError(null)
     setNotice(null)
-    setSaving(true)
-    try {
-      const result = await detectRemindersNow()
-      const raised =
-        result.created === 0
-          ? 'Nothing new to raise'
-          : `Raised ${result.created} reminder${result.created === 1 ? '' : 's'}`
-      const delivered =
-        result.sent === 0
-          ? 'nothing was due to go out yet'
-          : `delivered ${result.sent}`
-      setNotice(`${raised}, ${delivered}. Running this again is always safe.`)
-      setReloadToken((t) => t + 1)
-    } catch (err) {
-      setError(errorMessage(err, 'Could not run detection'))
-    } finally {
-      setSaving(false)
-    }
+    await run(async () => {
+      try {
+        const result = await detectRemindersNow()
+        const raised =
+          result.created === 0
+            ? 'Nothing new to raise'
+            : `Raised ${result.created} reminder${result.created === 1 ? '' : 's'}`
+        const delivered =
+          result.sent === 0
+            ? 'nothing was due to go out yet'
+            : `delivered ${result.sent}`
+        setNotice(`${raised}, ${delivered}. Running this again is always safe.`)
+        setReloadToken((t) => t + 1)
+      } catch (err) {
+        setError(errorMessage(err, 'Could not run detection'))
+      }
+    })
   }
 
   function field(key: keyof Omit<ReminderConfiguration, 'timezone'>, value: string | number) {
